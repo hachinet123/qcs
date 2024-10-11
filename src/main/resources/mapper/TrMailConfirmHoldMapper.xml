@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.TrMailConfirmHoldMapper">
+    <select id="queryList" resultType="com.tre.centralkitchen.domain.vo.system.TrMailConfirmHoldVo">
+        select
+        b.branchname as centerName,
+        mail.center_id as centerId,
+        concat(mail.mail_no,'便') as mail,
+        mail.mail_no as mailNo,
+        mail.producedconfirm_time as time,
+        trh.st_date as startDate,
+        trh.ed_date as endDate
+        from centralkitchen.mt_mail mail
+        inner join centralkitchen.mt_mailcontrol mtc
+        on mail.center_id=mtc.center_id
+        and mail.mail_no=mtc.mail_no
+        left join centralkitchen.tr_mailconfirm_hold trh
+        on mtc.dlvsched_date=trh.dlvsched_date
+        and mail.center_id = trh.center_id
+        and mail.mail_no = trh.mail_no
+        and trh.f_del=0
+        left join centralkitchen.branches b
+        on mail.center_id=b.branchcd
+        where mail.center_id=#{param.centerId}::int
+        <if test="param.mailNoList !=null and param.mailNoList.size>0">
+            and mail.mail_no in
+            <foreach collection="param.mailNoList" item="mailNo" index="index" separator="," open="(" close=")">
+                #{mailNo}::int
+            </foreach>
+        </if>
+        and mail.f_del=0
+        order by mail.center_id,mail.seq,mail.mail_no
+    </select>
+</mapper>

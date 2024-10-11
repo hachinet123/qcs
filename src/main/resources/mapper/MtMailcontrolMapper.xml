@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.MtMailcontrolMapper">
+    <update id="pcUpBin">
+        Update centralkitchen.mt_mailcontrol
+        Set produced_confirmed_date = null
+        , upd_date = now()
+        , upd_time = now()
+        Where center_id = #{centerId}
+        and mail_no = #{mailNo};
+    </update>
+    <select id="getConfirmBo" resultType="com.tre.centralkitchen.domain.bo.system.ActualProductionRecoveryBo">
+        select mt.center_id, mt.mail_no
+        from centralkitchen.mt_mailcontrol mt
+                 left join centralkitchen.tr_mailconfirm_hold tr
+                           on mt.center_id = tr.center_id
+                               and mt.mail_no = tr.mail_no
+        where (mt.produceplan_confirmed_date is null or mt.produced_confirmed_date is null)
+          and (tr.st_date is null or tr.ed_date <![CDATA[ < ]]> now())
+          and mt.f_del = 0
+        order by mt.center_id, mt.mail_no
+    </select>
+    <select id="getActualProductionList" resultType="com.tre.centralkitchen.domain.vo.system.MtMailcontrolVo">
+        select mc.center_id,
+        mn.branchname as center_name,
+        mc.mail_no,
+        cast(mc.mail_no as varchar) || '便' as mail,
+        mc.leadtime,
+        mc.dlvsched_date,
+        mc.produceplan_confirmed_date,
+        mc.produce_inst_date,
+        mc.produced_import_date,
+        mc.produced_confirmed_date,
+        mc.through_confirmed_date,
+        mc.out_confirmed_date,
+        CASE WHEN mc.produceplan_confirmed_date IS NULL THEN 0 ELSE 1 END AS produceplan_confirmed_flag,
+        CASE WHEN mc.produce_inst_date IS NULL THEN 0 ELSE 1 END AS produce_inst_flag,
+        CASE WHEN mc.produced_import_date IS NULL THEN 0 ELSE 1 END AS produced_import_flag,
+        CASE WHEN mc.produced_confirmed_date IS NULL THEN 0 ELSE 1 END AS produced_confirmed_flag,
+        CASE WHEN mc.through_confirmed_date IS NULL THEN 0 ELSE 1 END AS through_confirmed_flag,
+        CASE WHEN mc.out_confirmed_date IS NULL THEN 0 ELSE 1 END AS out_confirmed_flag,
+        CASE WHEN tr.st_date IS NOT NULL AND tr.ed_date IS NULL THEN 1 ELSE 0 END AS hold_flag,
+        mc.f_del,
+        mc.ins_date,
+        mc.ins_time,
+        mc.ins_user_id,
+        mc.ins_func_id,
+        mc.ins_ope_id,
+        mc.upd_date,
+        mc.upd_time,
+        mc.upd_user_id,
+        mc.upd_func_id,
+        mc.upd_ope_id,
+        m.discript,
+        m.memo
+        from centralkitchen.mt_mailcontrol mc
+        inner join centralkitchen.mt_mail m
+        on mc.center_id = m.center_id
+        and mc.mail_no = m.mail_no
+        left join centralkitchen.tr_mailconfirm_hold tr
+        on mc.center_id = tr.center_id
+        and mc.mail_no = tr.mail_no
+        and mc.dlvsched_date = tr.dlvsched_date
+        left join centralkitchen.branches mn
+        on mc.center_id = mn.branchcd
+        where mc.center_id = #{centerId}
+        <if test="mailNo != null and !mailNo.isEmpty()">
+            and mc.mail_no in
+            <foreach collection="mailNo" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        and mc.f_del = 0 and m.f_del = 0
+        order by mc.center_id, m.seq, m.mail_no
+    </select>
+    <select id="getHoldingMail" resultType="com.tre.centralkitchen.domain.vo.system.MtMailcontrolVo">
+        select mt.center_id, mt.mail_no
+        from centralkitchen.mt_mailcontrol mt
+                 left join centralkitchen.tr_mailconfirm_hold tr
+                           on mt.center_id = tr.center_id
+                               and mt.mail_no = tr.mail_no
+        where (mt.center_id = #{centerId} and mt.mail_no = #{mailNo})
+          and (tr.st_date is not null and tr.ed_date <![CDATA[ > ]]> now())
+          and mt.f_del = 0
+    </select>
+    <select id="getActualProductionVoPage" resultType="com.tre.centralkitchen.domain.vo.system.GetActualProductionVo">
+        select mc.center_id,
+        mn.branchname as center_name,
+        mc.mail_no,
+        cast(mc.mail_no as varchar) || '便' as mail,
+        mc.dlvsched_date,
+        mc.produced_import_date,
+        mc.produced_confirmed_date,
+        CASE WHEN mc.produced_import_date IS NULL THEN 0 ELSE 1 END AS produced_import_flag,
+        CASE WHEN mc.produced_confirmed_date IS NULL THEN 0 ELSE 1 END AS produced_confirmed_flag,
+        m.memo
+        from centralkitchen.mt_mailcontrol mc
+        inner join centralkitchen.mt_mail m
+        on mc.center_id = m.center_id
+        and mc.mail_no = m.mail_no
+        left join centralkitchen.branches mn
+        on mc.center_id = mn.branchcd
+        where mc.center_id = #{centerId}
+        <if test="mailNo != null and !mailNo.isEmpty()">
+            and mc.mail_no in
+            <foreach collection="mailNo" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        and mc.f_del = 0 and m.f_del = 0
+        order by mc.center_id, m.seq, m.mail_no
+    </select>
+    <select id="actualProductionConfirmVoPage" resultType="com.tre.centralkitchen.domain.vo.system.ActualProductionConfirmVo">
+        select mc.center_id,
+        mn.branchname as center_name,
+        mc.mail_no,
+        cast(mc.mail_no as varchar) || '便' as mail,
+        mc.dlvsched_date,
+        mc.produced_import_date,
+        mc.produced_confirmed_date,
+        CASE WHEN mc.produced_import_date IS NULL THEN 0 ELSE 1 END AS produced_import_flag,
+        CASE WHEN mc.produced_confirmed_date IS NULL THEN 0 ELSE 1 END AS produced_confirmed_flag,
+        m.memo
+        from centralkitchen.mt_mailcontrol mc
+        inner join centralkitchen.mt_mail m
+        on mc.center_id = m.center_id
+        and mc.mail_no = m.mail_no
+        left join centralkitchen.branches mn
+        on mc.center_id = mn.branchcd
+        where mc.center_id = #{centerId}
+        <if test="mailNo != null and !mailNo.isEmpty()">
+            and mc.mail_no in
+            <foreach collection="mailNo" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        and mc.f_del = 0 and m.f_del = 0
+        order by mc.center_id, m.seq, m.mail_no
+    </select>
+    <select id="fixAmountResultConfirmVoPage" resultType="com.tre.centralkitchen.domain.vo.system.FixAmountResultConfirmVo">
+        select mc.center_id,
+        mn.branchname as center_name,
+        mc.mail_no,
+        cast(mc.mail_no as varchar) || '便' as mail,
+        mc.dlvsched_date,
+        mc.through_confirmed_date,
+        CASE WHEN mc.through_confirmed_date IS NULL THEN 0 ELSE 1 END AS through_confirmed_flag,
+        m.memo
+        from centralkitchen.mt_mailcontrol mc
+        inner join centralkitchen.mt_mail m
+        on mc.center_id = m.center_id
+        and mc.mail_no = m.mail_no
+        left join centralkitchen.branches mn
+        on mc.center_id = mn.branchcd
+        where mc.center_id = #{centerId}
+        <if test="mailNo != null and !mailNo.isEmpty()">
+            and mc.mail_no in
+            <foreach collection="mailNo" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        and mc.f_del = 0 and m.f_del = 0
+        order by mc.center_id, m.seq, m.mail_no
+    </select>
+    <select id="actualProductionRecoveryVoPage" resultType="com.tre.centralkitchen.domain.vo.system.ActualProductionRecoveryVo">
+        select mc.center_id,
+        mn.branchname as center_name,
+        mc.mail_no,
+        cast(mc.mail_no as varchar) || '便' as mail,
+        mc.produced_confirmed_date,
+        CASE WHEN mc.produced_confirmed_date IS NULL THEN 0 ELSE 1 END AS produced_confirmed_flag
+        from centralkitchen.mt_mailcontrol mc
+        inner join centralkitchen.mt_mail m
+        on mc.center_id = m.center_id
+        and mc.mail_no = m.mail_no
+        left join centralkitchen.branches mn
+        on mc.center_id = mn.branchcd
+        where mc.center_id = #{centerId}
+        <if test="mailNo != null and !mailNo.isEmpty()">
+            and mc.mail_no in
+            <foreach collection="mailNo" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        and mc.f_del = 0 and m.f_del = 0
+        order by mc.center_id, m.seq, m.mail_no
+    </select>
+    <select id="getOrderStatus" resultType="com.tre.centralkitchen.domain.vo.system.OrderStatusMailControlVo">
+        select mt.center_id, mt.mail_no, mt.leadtime, m.seq
+        from centralkitchen.mt_mailcontrol mt
+        inner join centralkitchen.mt_mail m
+        on mt.center_id = m.center_id
+        and mt.mail_no = m.mail_no
+        where mt.center_id = #{centerId}
+        <if test="mailNos != null and !mailNos.isEmpty()">
+            and mt.mail_no in
+            <foreach collection="mailNos" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        and mt.f_del = 0 and m.f_del = 0
+        order by mt.center_id, mt.mail_no
+    </select>
+</mapper>

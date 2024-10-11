@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.MtInstructAutoPrintMapper">
+    <select id="selectAllList" resultType="com.tre.centralkitchen.domain.vo.system.MtInstructAutoPrintVo">
+        SELECT a.center_id,b.branchname AS centerName,
+        a.wkgrp_id AS workGroupId,e.name AS workGroupName,
+        a.qy,
+        a.autoprint_typeid as autoPrintTypeId,
+        a.f_del,a.ins_date,a.ins_time,a.ins_user_id,a.ins_func_id,a.ins_ope_id,
+        a.upd_date,a.upd_time,a.upd_user_id,a.upd_func_id,a.upd_ope_id
+        FROM centralkitchen.mt_instruct_auto_print a
+        LEFT JOIN centralkitchen.branches b
+        ON a.center_id = b.branchcd
+        AND b.isclosed = 0
+        LEFT join centralkitchen.mt_productwkgrp e
+        ON a.center_id = e.center_id
+        AND a.wkgrp_id = e.id
+        AND e.f_del = 0
+        WHERE a.qy != 0 AND a.qy is not null AND a.f_del = 0 AND a.center_id = #{centerId} AND a.autoprint_typeid = #{autoPrintTypeId}
+        ORDER BY a.wkgrp_id
+    </select>
+    <select id="selectLineList" resultType="com.tre.centralkitchen.domain.po.MtCenterLineAnyField">
+        SELECT center_id,
+               param_id,
+               line_id,
+               param_val1,
+               param_val2,
+               param_val3,
+               param_val4,
+               param_val5,
+               memo,
+               f_del,
+               ins_date,
+               ins_time,
+               ins_user_id,
+               ins_func_id,
+               ins_ope_id,
+               upd_date,
+               upd_time,
+               upd_user_id,
+               upd_func_id,
+               upd_ope_id
+        FROM centralkitchen.mt_center_line_anyfield
+        WHERE center_id = #{centerId}
+          AND param_id = 10
+          AND f_del = 0
+          AND param_val1 &lt;&gt; '0'
+          AND param_val1 IS NOT NULL
+    </select>
+</mapper>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.UserInfoMapper">
+
+    <select id="selectByUserId" resultType="com.tre.centralkitchen.domain.vo.system.UserInfoVo">
+        select
+        a.code,b.center_id,b.line_id,
+        c.other_center_authority,c.other_line_authority,
+        c.warehouse_authority,c.metamaterial_authority,c.middle_authority,
+        c.product_authority,c.master_authority,c.user_authority,c.except_authority,
+        c.system_authority,c.recipe_authority,
+        d.employeename
+        from centralkitchen.mt_userlogin a
+        inner join centralkitchen.mt_userattr b on a.code = b.code and b.f_del = 0
+        inner join centralkitchen.mt_userrole c on a.code = c.code and c.f_del = 0
+        left join centralkitchen.employees d on a.code::int = d.employeecode
+        where a.f_del = 0
+        and a.code = #{userId}
+    </select>
+</mapper>

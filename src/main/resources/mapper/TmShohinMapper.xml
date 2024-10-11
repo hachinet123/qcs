@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.TmShohinMapper">
+
+    <select id="findByKey" resultType="com.tre.centralkitchen.domain.vo.common.TmShohinVo">
+        select call_code,id,area_id,store_id,item_id,item_name,item_name_1dan,item_name_2dan,item_name_k,n_szname,
+        n_szname_typeid,volume,volume_typeid,line_id,wkgrp_id,department_id,category_id,subcategory_id,fritem_typeid,
+        teikan_typeid,cost_pc,cost,price,exptime,container_id,container_unit,vendor_id,height,width,depth,f_wm,
+        barcode_typeid,place_id,ad_id,comment_id,alergy_id,labeler_typeid,pctgt_typeid,f_active,lotgrp_id,tare_weight,
+        max_weight,min_weight,calory,labelput_typeid,f_del,ins_date,ins_time,ins_user_id,ins_func_id,ins_ope_id,
+        upd_date,upd_time,upd_user_id,upd_func_id,upd_ope_id from centralkitchen.tm_shohin
+        where
+        area_id = ${areaId}
+        and store_id=${storeId}
+        and item_id=${itemId}::varchar
+        and pctgt_typeid in (1,2)
+        <if test="inactive">
+            and f_active &lt;&gt; 9
+        </if>
+    </select>
+    <select id="findJanStoreAll" resultType="com.tre.centralkitchen.domain.vo.common.TmShohinVo">
+        select
+        b.call_code,b.id,b.area_id,b.store_id,b.item_id,b.item_name,b.item_name_1dan,b.item_name_2dan,b.item_name_k,b.n_szname,
+        b.n_szname_typeid,b.volume,b.volume_typeid,b.line_id,b.wkgrp_id,b.department_id,b.category_id,b.subcategory_id,b.fritem_typeid,
+        b.teikan_typeid,b.cost_pc,b.cost,b.price,b.exptime,b.container_id,b.container_unit,b.vendor_id,b.height,b.width,b.depth,b.f_wm,
+        b.barcode_typeid,b.place_id,b.ad_id,b.comment_id,b.alergy_id,b.labeler_typeid,b.pctgt_typeid,b.f_active,b.lotgrp_id,b.tare_weight,
+        b.max_weight,b.min_weight,b.calory,b.labelput_typeid,b.f_del,b.ins_date,b.ins_time,b.ins_user_id,b.ins_func_id,b.ins_ope_id,
+        b.upd_date,b.upd_time,b.upd_user_id,b.upd_func_id,b.upd_ope_id,c.unitname AS unitName
+        FROM
+        centralkitchen.tm_shohin b
+        inner join (select purchasegroupcd,branchcd from centralkitchen.purchasegroupbranches where branchcd=${storeId})
+        pur
+        on b.area_id=pur.purchasegroupcd
+        LEFT JOIN centralkitchen.mt_unit c
+        ON b.n_szname_typeid = c.unitcd
+        WHERE
+        b.item_id=${itemId}::varchar
+        and (b.store_id=${storeId} or b.store_id=0)
+        and b.pctgt_typeid in (1,2)
+        <if test="inactive">
+            and b.f_active &lt;&gt; 9
+        </if>
+    </select>
+    <select id="findJanByCallCodeAll" resultType="com.tre.centralkitchen.domain.vo.common.TmShohinVo">
+        select
+        b.call_code,b.id,b.area_id,b.store_id,b.item_id,b.item_name,b.item_name_1dan,b.item_name_2dan,b.item_name_k,b.n_szname,
+        b.n_szname_typeid,b.volume,b.volume_typeid,b.line_id,b.wkgrp_id,b.department_id,b.category_id,b.subcategory_id,b.fritem_typeid,
+        b.teikan_typeid,b.cost_pc,b.cost,b.price,b.exptime,b.container_id,b.container_unit,b.vendor_id,b.height,b.width,b.depth,b.f_wm,
+        b.barcode_typeid,b.place_id,b.ad_id,b.comment_id,b.alergy_id,b.labeler_typeid,b.pctgt_typeid,b.f_active,b.lotgrp_id,b.tare_weight,
+        b.max_weight,b.min_weight,b.calory,b.labelput_typeid,b.f_del,b.ins_date,b.ins_time,b.ins_user_id,b.ins_func_id,b.ins_ope_id,
+        b.upd_date,b.upd_time,b.upd_user_id,b.upd_func_id,b.upd_ope_id,c.unitname AS unitName
+        FROM
+        centralkitchen.tm_shohin b
+        inner join (select purchasegroupcd,branchcd from centralkitchen.purchasegroupbranches where branchcd=${storeId})
+        pur
+        on b.area_id=pur.purchasegroupcd
+        LEFT JOIN centralkitchen.mt_unit c
+        ON b.n_szname_typeid = c.unitcd
+        WHERE
+        b.call_code=${callCode}
+        and (b.store_id=${storeId} or b.store_id=0)
+        and b.pctgt_typeid in (1,2)
+        <if test="inactive">
+            and b.f_active &lt;&gt; 9
+        </if>
+    </select>
+    <select id="findCenterJanAll" resultType="com.tre.centralkitchen.domain.vo.common.TmShohinVo">
+        select
+        b.call_code,b.id,b.area_id,b.store_id,b.item_id,b.item_name,b.item_name_1dan,b.item_name_2dan,b.item_name_k,b.n_szname,
+        b.n_szname_typeid,b.volume,b.volume_typeid,b.line_id,b.wkgrp_id,b.department_id,b.category_id,b.subcategory_id,b.fritem_typeid,
+        b.teikan_typeid,b.cost_pc,b.cost,b.price,b.exptime,b.container_id,b.container_unit,b.vendor_id,b.height,b.width,b.depth,b.f_wm,
+        b.barcode_typeid,b.place_id,b.ad_id,b.comment_id,b.alergy_id,b.labeler_typeid,b.pctgt_typeid,b.f_active,b.lotgrp_id,b.tare_weight,
+        b.max_weight,b.min_weight,b.calory,b.labelput_typeid,b.f_del,b.ins_date,b.ins_time,b.ins_user_id,b.ins_func_id,b.ins_ope_id,
+        b.upd_date,b.upd_time,b.upd_user_id,b.upd_func_id,b.upd_ope_id
+        FROM centralkitchen.tm_shohin b
+        inner join centralkitchen.purchasegroupbranches pubr
+        on pubr.purchasegroupcd = b.area_id
+        <where>
+            <if test="inactive">
+                and b.f_active &lt;&gt; 9
+            </if>
+            <if test="centerId != null ">
+                and pubr.branchcd = #{centerId}
+            </if>
+            <if test="itemId != null and itemId != '' ">
+                and b.item_id = #{itemId}
+            </if>
+            and b.store_id=0
+        </where>
+    </select>
+    <select id="findItemNameByCenterCallCode" resultType="com.tre.centralkitchen.domain.vo.common.TmShohinVo">
+        select
+        b.call_code,b.id,b.area_id,b.store_id,b.item_id,b.item_name,b.item_name_1dan,b.item_name_2dan,b.item_name_k,b.n_szname,
+        b.n_szname_typeid,b.volume,b.volume_typeid,b.line_id,b.wkgrp_id,b.department_id,b.category_id,b.subcategory_id,b.fritem_typeid,
+        b.teikan_typeid,b.cost_pc,b.cost,b.price,b.exptime,b.container_id,b.container_unit,b.vendor_id,b.height,b.width,b.depth,b.f_wm,
+        b.barcode_typeid,b.place_id,b.ad_id,b.comment_id,b.alergy_id,b.labeler_typeid,b.pctgt_typeid,b.f_active,b.lotgrp_id,b.tare_weight,
+        b.max_weight,b.min_weight,b.calory,b.labelput_typeid,b.f_del,b.ins_date,b.ins_time,b.ins_user_id,b.ins_func_id,b.ins_ope_id,
+        b.upd_date,b.upd_time,b.upd_user_id,b.upd_func_id,b.upd_ope_id
+        FROM centralkitchen.tm_shohin b
+        INNER JOIN centralkitchen.purchasegroupbranches pubr
+        ON pubr.purchasegroupcd = b.area_id
+        where pubr.branchcd = #{centerId}
+          and b.call_code = #{callCode}
+          and b.store_id = 0
+          and b.pctgt_typeid = 1
+    </select>
+    <select id="queryPage" resultType="com.tre.centralkitchen.domain.vo.common.TmShohinVo">
+        select
+        b.call_code,b.id,b.area_id,b.store_id,b.item_id,b.item_name,b.item_name_1dan,b.item_name_2dan,b.item_name_k,b.n_szname,
+        b.n_szname_typeid,b.volume,b.volume_typeid,b.line_id,
+        b.wkgrp_id,b.department_id,b.category_id,b.subcategory_id,b.fritem_typeid,
+        b.teikan_typeid,b.cost_pc,b.cost,b.price,b.exptime,b.container_id,b.container_unit,b.vendor_id,b.height,b.width,b.depth,b.f_wm,
+        b.barcode_typeid,b.place_id,b.ad_id,b.comment_id,b.alergy_id,b.labeler_typeid,b.pctgt_typeid,b.f_active,b.lotgrp_id,b.tare_weight,
+        b.max_weight,b.min_weight,b.calory,b.labelput_typeid,b.f_del,b.ins_date,b.ins_time,b.ins_user_id,b.ins_func_id,b.ins_ope_id,
+        b.upd_date,b.upd_time,b.upd_user_id,b.upd_func_id,b.upd_ope_id,l.linename AS lineName,
+        c.branchname AS centerName,
+        d.departmentname AS departmentName,
+        sd.subdeptname AS categoryName,
+        v.varietyname AS subcategoryName,
+        i.itemname AS segmentName,
+        se.subsegmentname AS subsegmentName
+        FROM centralkitchen.tm_shohin b
+        INNER JOIN centralkitchen.purchasegroupbranches css
+        ON b.area_id=css.purchasegroupcd
+        AND css.branchcd=#{param.centerId}
+        INNER JOIN centralkitchen.mt_useline useLine
+        ON b.line_id = useLine.line_id
+        LEFT JOIN centralkitchen.lines l ON b.line_id = l.linecd
+        LEFT JOIN centralkitchen.branches c ON css.branchcd = c.branchcd
+        INNER JOIN centralkitchen.products p ON b.item_id = p.productcd
+        INNER JOIN centralkitchen.subsegments vf
+        ON p.departmentcd = vf.departmentcd
+        AND p.subdeptcd = vf.subdeptcd
+        AND p.varietycd = vf.varietycd
+        AND p.itemcd = vf.itemcd
+        AND p.subsegmentcd =  vf.subsegmentcd
+        INNER JOIN centralkitchen.departments d
+        ON vf.departmentcd = d.departmentcd
+        INNER JOIN centralkitchen.subdepartments sd
+        ON vf.departmentcd = sd.departmentcd AND vf.subdeptcd = sd.subdeptcd
+        INNER JOIN centralkitchen.varieties v
+        ON vf.departmentcd = v.departmentcd AND vf.subdeptcd = v.subdeptcd AND vf.varietycd = v.varietycd
+        INNER JOIN centralkitchen.items i
+        ON vf.departmentcd = i.departmentcd AND vf.subdeptcd = i.subdeptcd AND vf.varietycd = i.varietycd AND vf.itemcd = i.itemcd
+        INNER JOIN centralkitchen.subsegments se
+        ON vf.departmentcd = se.departmentcd AND vf.subdeptcd = se.subdeptcd AND vf.varietycd = se.varietycd AND vf.itemcd = se.itemcd
+        <where>
+            <if test="param.lineIdList!=null and param.lineIdList.size>0">
+                and b.line_id in
+                <foreach collection="param.lineIdList" item="item" index="index" separator="," open="(" close=")">
+                    #{item}::int
+                </foreach>
+            </if>
+            <if test="param.itemIdList!=null and param.itemIdList.size>0">
+                and b.item_id in
+                <foreach collection="param.itemIdList" item="item" index="index" separator="," open="(" close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="param.callCode != null">
+                and b.call_code =#{param.callCode}
+            </if>
+            <if test="param.itemNameList!=null and param.itemNameList.size>0">
+                and (
+                <foreach collection="param.itemNameList" item="item" index="index" separator="or">
+                    b.item_name like CONCAT ('%',#{item},'%') or b.item_name_k like CONCAT ('%',#{item},'%')
+                </foreach>
+                )
+            </if>
+            <if test="param.fActive">
+                and b.f_active &lt;&gt; 9
+            </if>
+            and b.store_id = 0
+            and b.f_del = 0
+        </where>
+        order by useLine.seq,b.line_id,b.item_id,b.call_code,b.item_name
+    </select>
+</mapper>

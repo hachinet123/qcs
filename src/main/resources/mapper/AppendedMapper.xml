@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.AppendedMapper">
+
+    <select id="queryAppended" resultType="com.tre.centralkitchen.domain.vo.system.AppendedUpdateVo">
+        SELECT
+        concat_ws('-',to_char(tob.dlvsched_date,'yyyyMMdd'),
+        tob.center_id,
+        tob.mail_no,
+        tob.slip_code,
+        tob.store_id,
+        tom.line_no) as id,
+        tob.center_id,
+        c.branchname AS centerName,
+        tob.slip_code,
+        tob.dlvsched_date,
+        tom.line_no,
+        COALESCE ( ts.call_code, ts1.call_code ) AS callCode,
+        tom.item_id,
+        COALESCE ( ts.item_name, ts1.item_name ) AS itemName,
+        tob.mail_no,
+        concat(tob.mail_no,'便') as mail,
+        COALESCE ( ts.line_id, ts1.line_id ) as lineId,
+        l.linename AS lineName,
+        tob.store_id,
+        dlvstore.shortname AS storeName,
+        tom.place_id,
+        mp.name AS placeName,
+        tom.lot_no AS lotNo,
+        abs(tom.qy) AS quantity,
+        abs(tom.weight_am) AS weight,
+        tom.cost_rcp AS costRcp,
+        tom.cost,
+        tom.price,
+        abs(tom.recipe_am) AS costRcpAm,
+        abs(tom.order_am) AS costAm,
+        abs(tom.sales_am) AS priceAm,
+        COALESCE ( ts.teikan_typeid, ts1.teikan_typeid ) as teikanTypeid,
+        (case when COALESCE ( ts.teikan_typeid, ts1.teikan_typeid ) = 0 then '不定貫' else '定貫' end) as teikanTypeName
+
+        FROM
+        centralkitchen.tr_out_transbill tob
+
+        INNER JOIN centralkitchen.tr_out_transitem tom
+        ON tob.slip_code = tom.slip_code
+        AND tob.dlvsched_date = tom.dlvsched_date
+        AND tom.center_id = tob.center_id
+        AND tob.mail_no = tom.mail_no
+        AND tob.store_id = tom.store_id
+
+        INNER JOIN centralkitchen.wk_odr_transbill wot
+        ON tob.dlvsched_date = wot.trans_date
+        AND tob.slip_code = wot.transbill_code
+        AND tom.line_no = wot.line_no
+        AND tob.center_id = wot.center_id
+        AND tob.mail_no = wot.mail_no
+        AND wot.f_send = 0
+        LEFT JOIN centralkitchen.purchasegroupbranches pg ON tob.store_id = pg.branchcd
+        LEFT JOIN centralkitchen.tm_shohin ts
+        ON pg.purchasegroupcd = ts.area_id
+        AND ts.store_id = tob.store_id
+        AND tom.item_id = ts.item_id
+
+        LEFT JOIN centralkitchen.tm_shohin ts1
+        ON pg.purchasegroupcd = ts1.area_id
+        AND ts1.store_id = 0
+        AND tom.item_id = ts1.item_id
+
+        LEFT JOIN  (select distinct store_id,shortname,line_id from centralkitchen.mt_centerdlvstore where center_id=#{param.centerId}) dlvstore
+        ON tob.store_id = dlvstore.store_id
+        AND dlvstore.line_id = COALESCE(ts.line_id, ts1.line_id)
+        LEFT JOIN centralkitchen.branches c ON tob.center_id = c.branchcd
+        LEFT JOIN centralkitchen.mt_place mp ON tom.place_id = mp.id
+        LEFT JOIN centralkitchen.lines l ON COALESCE ( ts.line_id, ts1.line_id ) = l.linecd
+
+        <where>
+            tob.center_id = #{param.centerId}
+            and tob.dlvsched_date <![CDATA[>=]]> #{param.startDate} and tob.dlvsched_date <![CDATA[<=]]>#{param.endDate}
+            <if test="param.lineIdList!=null and param.lineIdList.size>0">
+                and COALESCE ( ts.line_id, ts1.line_id ) in
+                <foreach collection="param.lineIdList" item="lines" index="index" separator="," open="(" close=")">
+                    #{lines}::int
+                </foreach>
+            </if>
+            <if test="param.mailNoList !=null and param.mailNoList.size>0">
+                and tob.mail_no IN
+                <foreach collection="param.mailNoList" item="mainlNo" index="index" separator="," open="(" close=")">
+                    #{mainlNo}::int
+                </foreach>
+            </if>
+            <if test="param.itemId != null and param.itemId != ''">
+                and tom.item_id = #{param.itemId}
+            </if>
+            <if test="param.callCode != null">
+                and COALESCE ( ts.call_code, ts1.call_code )=#{param.callCode}
+            </if>
+            <if test="param.itemName != null and param.itemName != ''">
+                and (COALESCE ( ts.item_name, ts1.item_name ) like CONCAT ('%',#{param.itemName},'%') or
+                COALESCE (ts.item_name_k, ts1.item_name_k ) like CONCAT ('%',#{param.itemName},'%'))
+            </if>
+            <if test="param.slipCode != null">
+                and tob.slip_code = #{param.slipCode}
+            </if>
+            <if test="param.lineNo != null">
+                and tom.line_no = #{param.lineNo}
+            </if>
+        </where>
+        order by tob.slip_code,tom.line_no
+    </select>
+</mapper>

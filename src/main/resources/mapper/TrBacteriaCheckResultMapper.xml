@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.TrBacteriaCheckResultMapper">
+
+
+    <update id="bacteriaCheckItemResultUpdate"
+            parameterType="com.tre.centralkitchen.domain.bo.system.TrBacteriaItemResultBo">
+        <foreach collection="param" item="item" separator=";">
+            update centralkitchen.tr_bacteriacheck_item_result
+            <set>
+                <if test="item.ecolies !=null and item.ecolies != ''">
+                    ecolies=#{item.ecolies},
+                </if>
+                <if test="item.ecoli !=null and item.ecoli != ''">
+                    ecoli=#{item.ecoli},
+                </if>
+                <if test="item.fStaphylococcus !=null ">
+                    f_staphylococcus = #{item.fStaphylococcus},
+                </if>
+                <if test="item.fPassed !=null ">
+                    f_passed = #{item.fPassed},
+                </if>
+                <if test="item.memo !=null and item.memo != ''">
+                    memo = #{item.memo}
+                </if>
+
+
+            </set>
+            where id = #{item.id} and seq =#{item.seq}
+        </foreach>
+
+
+    </update>
+
+
+    <select id="bacteriaCheckResultSelect" resultType="com.tre.centralkitchen.domain.vo.system.BacteriaCheckResultVo"
+            parameterType="java.lang.Integer">
+
+  select tcheck.id, checkstat_typeid as checkStatTypeId ,checkstate.name as checkStatTypeName  , title, branches.branchname as center , othercenter, req_date, req_user_id, employees.employeename as reqUserName ,
+         tcheck.comment
+        from centralkitchen.tr_bacteriacheck  tcheck
+          inner join centralkitchen.branches branches on tcheck.center_id = branches.branchcd
+          inner join centralkitchen.employees employees on tcheck.req_user_id = employees.employeecode
+		   inner join  (select id,name from centralkitchen.mt_type mtype  where mtype.typetype_id =1024)
+		as checkstate
+		on tcheck.checkstat_typeid = checkstate.id
+
+        where tcheck.id =#{id}  and tcheck.f_del = 0
+
+
+    </select>
+    <select id="bacteriaCheckItemResultSelect"
+            resultType="com.tre.centralkitchen.domain.vo.system.BacteriaCheckResultDateVo"
+            parameterType="java.lang.Integer">
+  select item.id ,item.seq , item.check_item as checkItem ,mtype.name as tempZone, checktime.id as checkTypeId ,times.qy as qy, results.ecolies, results.ecoli,
+        results.f_staphylococcus as fStaphylococcus,results.f_passed as fPassed, results.memo
+		from centralkitchen.tr_bacteriacheck_item item
+        inner join (select id, name  from centralkitchen.mt_type   where  typetype_id =1016)
+        as mtype
+        on item.tempzone_typeid = mtype.id
+        left join centralkitchen.tr_bacteriacheck_item_result results on results.id = item.id and results.seq = item.seq
+        left join centralkitchen.tr_bacteriacheck_time_result times on times.id = item.id and times.seq = item.seq
+		 inner join (select id, name ,seq from centralkitchen.mt_type   where  typetype_id =1022)
+        as checktime
+        on times.checktime_typeid = checktime.id
+		inner join centralkitchen.tr_bacteriacheck_time tim on tim.id = times.id and tim.seq = times.seq
+      where results.id = 202311065 and results.f_del = 0
+
+    </select>
+    <select id="selectEmailReceiver" resultType="com.tre.centralkitchen.domain.po.EmailReceiver">
+          select task_id as taskId , subtask_id as subTaskId , task_name as taskName, to_email as toEmail, cc_email  as ccEmail, bcc_email as bccEmail, f_del, ins_date, ins_time, ins_user_id, ins_func_id,
+        ins_ope_id, upd_date, upd_time,upd_user_id, upd_func_id, upd_ope_id
+        from  centralkitchen.mt_emailreceiver
+        where task_id = 1 and subtask_id =2 and f_del = 0
+
+    </select>
+    <select id="selectBacteriaCheckResultPdf"
+            resultType="com.tre.centralkitchen.domain.vo.system.BacteriaCheckResultPDFVo">
+
+ select item.check_item as checkItem ,mtype.name as tempZone , checktime.name as checkDate,   times.qy as qy, results.ecolies,
+     case f_staphylococcus  when 0 then '陰性' when 1 then '陽性' else ' ' end  as fStaphylococcus , results.memo
+        from centralkitchen.tr_bacteriacheck_item item
+        inner join (select id, name  from centralkitchen.mt_type   where  typetype_id =1016)
+        as mtype
+        on item.tempzone_typeid = mtype.id
+        left join centralkitchen.tr_bacteriacheck_item_result results on results.id = item.id and results.seq = item.seq
+        left join centralkitchen.tr_bacteriacheck_time_result times on times.id = item.id and times.seq = item.seq
+		 inner join (select id, name  from centralkitchen.mt_type   where  typetype_id =1022)
+        as checktime
+        on times.checktime_typeid = checktime.id
+		where item.id = #{id} and item.f_del=0
+		order by times.checktime_typeid
+
+
+
+    </select>
+</mapper>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.MailBasicSettingMapper">
+    <select id="getBasicSettingList" resultType="com.tre.centralkitchen.domain.vo.system.MailBasicSettingVo">
+        select
+        m.center_id as centerId,
+        b.branchname as centerName,
+        concat(m.mail_no,'便') as mail,
+        m.mail_no as mailNo,
+        m1.store_id as storeId,
+        m1.branchname as storeName,
+        s.statename as stateName,
+        m.sel_group as selGroup,
+        m.discript as discript
+        from centralkitchen.mt_mail m
+        left join (
+        select ms.center_id,ms.mail_no,ms.store_id,b.branchname,b.statecd from centralkitchen.mt_mailstore ms
+        left join centralkitchen.branches b
+        on ms.store_id = b.branchcd
+        where ms.f_del = 0) m1
+        on m.center_id = m1.center_id
+        and m.mail_no = m1.mail_no
+        left join centralkitchen.branches b
+        on m.center_id = b.branchcd
+        left join centralkitchen.states s on m1.statecd=s.statecd
+        <where>
+            <if test="param.centerId != null and param.centerId != 0">
+                and m.center_id = #{param.centerId}
+            </if>
+            and m.f_del=0
+        </where>
+        order by m.center_id,
+        m.seq,
+        m.mail_no,
+        m1.store_id
+    </select>
+    <select id="getMailNo" resultType="com.tre.centralkitchen.domain.vo.system.MailBasicSettingVo">
+        select a.center_id as centerId,
+               a.mail_no   as mailNo,
+               a.sel_group as selGroup,
+               a.memo      as memo,
+               a.seq       as seq
+        from centralkitchen.mt_mail a
+                 inner join centralkitchen.mt_mailstore b
+                            on a.center_id = b.center_id and a.mail_no = b.mail_no and b.store_id = #{param.storeId} and
+                               b.f_del = 0
+        where a.center_id = #{param.centerId}
+          and a.sel_group = #{param.selGroup}
+          and a.mail_no not in (#{param.mailNo})
+          and a.f_del = 0
+    </select>
+</mapper>

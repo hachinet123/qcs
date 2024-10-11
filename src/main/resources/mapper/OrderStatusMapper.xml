@@ -1,0 +1,1699 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.OrderStatusMapper">
+    <resultMap id="total" type="com.tre.centralkitchen.common.domain.CustomPageData" />
+    <resultMap id="orderStatusVo" type="com.tre.centralkitchen.domain.vo.system.OrderStatusVo" />
+    <resultMap id="orderStatusStoreVo" type="com.tre.centralkitchen.domain.vo.system.OrderStatusStoreVo" />
+    <sql id="sqlOrderStatus">
+        DECLARE @start_day AS VARCHAR(10) = dateadd(day,1,getdate())
+        DECLARE @end_day AS VARCHAR(10)= dateadd(day,7,getdate())
+        DECLARE @now DATETIME= CONVERT(varchar,GETDATE(),111)
+
+
+        set @start_day = #{bo.deliveryStartDate}
+        set @end_day = #{bo.deliveryEndDate}
+
+        DECLARE @days AS INT
+        -- 定数発注データを取得時にcross joinする日付データ
+        CREATE TABLE #DeliveryDates
+        (
+        DeliveryDate DATETIME
+        )   ON [PRIMARY]
+
+        DECLARE @count AS INT
+        SET @count = 0
+        SET @days = DATEDIFF(DD,@start_day,@end_day)
+
+        WHILE @count &lt;= @days
+        BEGIN
+        INSERT INTO #DeliveryDates
+        VALUES(DATEADD(DD,@count,@start_day))
+        SET @count = @count + 1
+        END
+
+        create table #product(
+        商品CD varchar(13) ,
+        地域CD int ,
+        店CD int,
+        グループCD int,
+        呼出品番 int,
+        商品名 varchar(50),
+        商品名カナ varchar(50),
+        作業グループCD int,
+        規格 varchar(50),
+        標準内容量 varchar(50)
+        )
+
+        create clustered index ix_clu_for_product on #product(商品CD,地域CD,店CD)
+        insert into #product
+        select
+        t.商品CD,t.地域CD,t.店CD,
+        t.グループCD,
+        t.呼出品番,
+        t.商品名,
+        t.商品名カナ,
+        t.作業グループCD,
+        convert(varchar(10),t.規格分量)+f.単位名 as 規格,
+        convert(varchar(10),t.標準内容量)+e.単位名 as 標準内容量
+        from [${ip120}].[PF_Master].[dbo].[T_M商品] t
+        LEFT JOIN [${ip120}].[PF_Master].[dbo].[T_M単位] f
+        ON t.規格単位CD=f.単位CD
+        LEFT JOIN [${ip120}].[PF_Master].[dbo].[T_M単位] e
+        ON t.標準内容量単位CD=e.単位CD
+        where (ベンダーCD =#{bo.vendorId} or PC対象=2)
+        <if test="bo.lineIds != null and bo.lineIds.length > 0">
+            and t.グループCD in
+            <foreach collection="bo.lineIds" open="(" separator="," close=")" item="item" index="index">
+                ${item}
+            </foreach>
+        </if>
+        <if test="bo.jan != null and '' != bo.jan">
+            AND t.商品CD = #{bo.jan}
+        </if>
+        <if test="bo.callCd != null">
+            AND t.呼出品番 = #{bo.callCd}
+        </if>
+        <if test="bo.productName != null and '' != bo.productName">
+            AND (t.商品名 like '%${bo.productName}%' or t.商品名カナ like '%${bo.productName}%')
+        </if>
+        and t.廃盤区分!=9
+
+        create table #product_area(
+        商品CD varchar(13) ,
+        地域CD int ,
+        店CD int,
+        グループCD int,
+        呼出品番 int,
+        商品名 varchar(50),
+        商品名カナ varchar(50),
+        作業グループCD int,
+        規格 varchar(50),
+        標準内容量 varchar(50)
+        )
+        create clustered index ix_clu_for_product_area on #product_area(商品CD,グループCD,地域CD)
+
+        create table #product_store(
+        商品CD varchar(13) ,
+        地域CD int ,
+        店CD int,
+        グループCD int,
+        呼出品番 int,
+        商品名 varchar(50),
+        商品名カナ varchar(50),
+        作業グループCD int,
+        規格 varchar(50),
+        標準内容量 varchar(50)
+        )
+        create clustered index ix_clu_for_store on #product_store(商品CD,店CD)
+
+        insert into #product_area
+        select
+        商品CD,地域CD,店CD,
+        グループCD,
+        呼出品番,
+        商品名,
+        商品名カナ,
+        作業グループCD,
+        規格,
+        標準内容量
+        from #product where 店CD=0
+
+        insert into #product_store
+        select
+        商品CD,地域CD,店CD,
+        グループCD,
+        呼出品番,
+        商品名,
+        商品名カナ,
+        作業グループCD,
+        規格,
+        標準内容量
+        from #product where 店CD &lt;&gt; 0
+
+        create table #product_distinct(
+        商品CD varchar(13) ,
+        グループCD int
+        )
+        create clustered index ix_clu_for_product_distinct on #product_distinct(商品CD,グループCD)
+        insert into #product_distinct
+        select
+        distinct
+        商品CD
+        ,グループCD
+        from #product
+
+        CREATE table #view(
+        店CD int ,
+        商品CD varchar(13)
+        )
+
+        create clustered index ix_clu_for_view on #view(店CD,商品CD)
+        insert into #view
+        select
+        VO.店CD,
+        VO.商品CD
+        from [${ip20}].[PCSubContract].dbo.[View_外注商品有効リスト] VO WITH (NOLOCK)
+
+        CREATE TABLE #mt_mailcontrol(
+        centerId int NOT NULL,
+        vendorId int NOT NULL,
+        mailNo int NOT NULL,
+        leadtime int NOT NULL,
+        seq int
+        )
+
+        <if test="bo.mailControlList != null and bo.mailControlList.size > 0">
+            insert into #mt_mailcontrol
+            (centerId, vendorId, mailNo, leadtime, seq)
+            values
+            <foreach collection="bo.mailControlList" index="index" item="item" open="" close="" separator=",">
+                (#{item.centerId}, #{bo.vendorId}, #{item.mailNo}, #{item.leadtime}, #{item.seq})
+            </foreach>
+            ;
+        </if>
+        CREATE TABLE #mt_workgroup(
+        id int NOT NULL,
+        centerId int NOT NULL,
+        lineId int NOT NULL,
+        name varchar(50),
+        seq int
+        );
+        <if test="bo.workGroupList != null and bo.workGroupList.size > 0">
+            insert into #mt_workgroup
+            (id, centerId, lineId, name, seq)
+            values
+            <foreach collection="bo.workGroupList" index="index" item="item" open="" close="" separator=",">
+                (#{item.id}, #{item.centerId}, #{item.lineId}, #{item.name}, #{item.seq})
+            </foreach>
+            ;
+        </if>
+
+        UPDATE tmp
+        SET id = id - isnull(chg.id_value,0)
+        FROM #mt_workgroup tmp
+        LEFT JOIN dborder.dbo.mt_productwkgrp_change chg
+        ON tmp.centerId=chg.center_id;
+
+
+        -- 普通発注分データの取得
+        SELECT
+        OQ.ProdJAN AS OLJAN,
+        '' AS  ProdName,
+        OQ.BranchCD AS OLBranch,
+        TBS.グループCD AS LineCD,
+        OQ.SupplierCD,
+        0 as LogicFlg,
+        OQ.ProdJAN AS OQJAN,
+        OQ.BranchCD AS OQBranch,
+        OQ.DeliveryDate,
+        OQ.Bin AS OQBin,
+        OQ.UserCD,
+        ISNULL(OQ.OrderQty,OQ.RecQuantity) OrderQty,
+        CONVERT(VARCHAR(13),NULL) AS FQJAN,
+        NULL AS FQBranch,
+        NULL AS FQBin,
+        NULL AS MonFixQty,
+        NULL AS TueFixQty,
+        NULL AS WedFixQty,
+        NULL AS ThuFixQty,
+        NULL AS FriFixQty,
+        NULL AS SatFixQty,
+        NULL AS SunFixQty,
+        DDM.DeliveryStartOne,
+        DDM.DeliveryEndOne,
+        DDM.DeliveryStartTwo,
+        DDM.DeliveryEndTwo,
+        DDM.DeliveryStartThree,
+        DDM.DeliveryEndThree
+        INTO
+        #OrderQty_temp_普通
+        FROM
+        [dbOrder].[dbo].[shT_OrderQty_test] OQ WITH (NOLOCK)
+        INNER JOIN [dbOrder].[dbo].[shM_OrderListAll] OL WITH (NOLOCK)
+        ON OQ.ProdJAN = OL.ProdJAN
+        AND OQ.BranchCD = OL.BranchCD
+        AND OQ.SupplierCD = OL.SupplierCD
+        inner join #mt_mailcontrol mail
+        on OQ.Bin=mail.mailNo
+        and OQ.SupplierCD=mail.vendorId
+        INNER JOIN #product_distinct TBS
+        ON TBS.商品CD = OQ.ProdJAN
+        LEFT JOIN
+        [dbOrder].[dbo].[shM_DeliveryDateMaster] DDM WITH (NOLOCK)
+        ON
+        OQ.ProdJAN = DDM.ProdJAN
+        AND OQ.BranchCD = DDM.BranchCD
+        WHERE
+        OQ.SupplierCD = #{bo.vendorId}
+        AND OQ.DeliveryDate BETWEEN @start_day AND @end_day
+        AND (OQ.OrderQty IS NOT NULL OR OQ.RecQuantity IS NOT NULL)
+        <if test="bo.lineIds != null and bo.lineIds.length > 0">
+            AND TBS.グループCD in
+            <foreach collection="bo.lineIds" open="(" separator="," close=")" item="item" index="index">
+                ${item}
+            </foreach>
+        </if>
+
+        -- 客注データの取得
+        SELECT
+        OQ.ProdJAN AS OLJAN,
+        '' AS  ProdName,
+        OQ.BranchCD AS OLBranch,
+        TBS.グループCD AS LineCD,
+        OQ.SupplierCD,
+        0 as LogicFlg,
+        OQ.ProdJAN AS OQJAN,
+        OQ.BranchCD AS OQBranch,
+        OQ.DeliveryDate,
+        MM.Bin AS OQBin,
+        0 AS UserCD,
+        OQ.CustOrderQty AS OrderQty,
+        DDM.DeliveryStartOne,
+        DDM.DeliveryEndOne,
+        DDM.DeliveryStartTwo,
+        DDM.DeliveryEndTwo,
+        DDM.DeliveryStartThree,
+        DDM.DeliveryEndThree
+        INTO #temp
+        FROM
+        [dbOrder].[dbo].[shT_OrderQty_test] OQ WITH (NOLOCK)
+        INNER JOIN [dbOrder].[dbo].[shM_OrderListAll] OL WITH (NOLOCK)
+        ON OQ.ProdJAN = OL.ProdJAN
+        AND OQ.BranchCD = OL.BranchCD
+        AND OQ.SupplierCD = OL.SupplierCD
+        INNER JOIN #product_distinct TBS
+        ON TBS.商品CD = OQ.ProdJAN
+        INNER JOIN (
+        SELECT
+        Distinct
+        TM.mailNo AS 便,
+        BN.Bin AS Bin
+        FROM #mt_mailcontrol TM
+        INNER JOIN
+        [dbOrder].[dbo].[shM_CustOrderBin] BN WITH (NOLOCK)
+        ON TM.LeadTime = BN.LeadTime
+        WHERE BN.PcCode = #{bo.vendorId}
+        ) MM
+        ON OQ.Bin = MM.便
+        LEFT JOIN
+        [dbOrder].[dbo].[shM_DeliveryDateMaster] DDM WITH (NOLOCK)
+        ON OQ.ProdJAN = DDM.ProdJAN
+        AND OQ.BranchCD = DDM.BranchCD
+        WHERE
+        OQ.SupplierCD = #{bo.vendorId}
+        AND DeliveryDate BETWEEN @start_day AND @end_day
+        AND OQ.CustOrderQty IS NOT NULL
+        <if test="bo.lineIds != null and bo.lineIds.length > 0">
+            AND TBS.グループCD in
+            <foreach collection="bo.lineIds" open="(" separator="," close=")" item="item" index="index">
+                ${item}
+            </foreach>
+        </if>
+
+
+        -- 客注の合算
+        SELECT
+        OLJAN,
+        ProdName,
+        OLBranch,
+        LineCD,
+        SupplierCD,
+        LogicFlg,
+        OQJAN,
+        OQBranch,
+        DeliveryDate,
+        OQBin,
+        UserCD,
+        SUM(OrderQty) AS OrderQty,
+        CONVERT(VARCHAR(13),NULL) AS FQJAN,
+        NULL AS FQBranch,
+        NULL AS FQBin,
+        NULL AS MonFixQty,
+        NULL AS TueFixQty,
+        NULL AS WedFixQty,
+        NULL AS ThuFixQty,
+        NULL AS FriFixQty,
+        NULL AS SatFixQty,
+        NULL AS SunFixQty,
+        DeliveryStartOne,
+        DeliveryEndOne,
+        DeliveryStartTwo,
+        DeliveryEndTwo,
+        DeliveryStartThree,
+        DeliveryEndThree
+        INTO #OrderQty_temp_客注
+        FROM #temp
+        GROUP BY
+        OLJAN,
+        ProdName,
+        OLBranch,
+        LineCD,
+        SupplierCD,
+        LogicFlg,
+        OQJAN,
+        OQBranch,
+        DeliveryDate,
+        OQBin,
+        UserCD,
+        DeliveryStartOne,
+        DeliveryEndOne,
+        DeliveryStartTwo,
+        DeliveryEndTwo,
+        DeliveryStartThree,
+        DeliveryEndThree
+
+
+        -- 定数発注データの取得
+        SELECT
+        DISTINCT
+        OL.ProdJAN AS OLJAN,
+        OL.ProdName,
+        OL.BranchCD AS OLBranch,
+        OL.LineCD,
+        OL.SupplierCD,
+        OL.LogicFlg,
+        CONVERT(VARCHAR(13),NULL) AS OQJAN,
+        NULL AS OQBranch,
+        D.DeliveryDate,
+        NULL AS OQBin,
+        FQ.UserCD,
+        FQ.OrderStartDate,
+
+        CASE
+        WHEN FQ.OrderStartDate &lt;= @now
+        THEN
+        CASE
+        DATEPART(WEEKDAY,D.DeliveryDate)
+        WHEN 1
+        THEN
+        CASE
+        WHEN FQ.SunFixQty IS NULL
+        THEN 0
+        ELSE FQ.SunFixQty
+        END
+        WHEN 2
+        THEN
+        CASE
+        WHEN FQ.MonFixQty IS NULL
+        THEN 0
+        ELSE FQ.MonFixQty
+        END
+        WHEN 3
+        THEN
+        CASE
+        WHEN FQ.TueFixQty IS NULL
+        THEN 0
+        ELSE FQ.TueFixQty
+        END
+        WHEN 4
+        THEN
+        CASE
+        WHEN FQ.WedFixQty IS NULL
+        THEN 0
+        ELSE FQ.WedFixQty
+        END
+        WHEN 5
+        THEN
+        CASE
+        WHEN FQ.ThuFixQty IS NULL
+        THEN 0
+        ELSE FQ.ThuFixQty
+        END
+        WHEN 6
+        THEN
+        CASE
+        WHEN FQ.FriFixQty IS NULL
+        THEN 0
+        ELSE FQ.FriFixQty
+        END
+        WHEN 7
+        THEN
+        CASE
+        WHEN FQ.SatFixQty IS NULL
+        THEN 0
+        ELSE FQ.SatFixQty
+        END
+        END
+        WHEN FQ.OrderStartDate &gt; @now
+        THEN 0
+        END AS OrderQty,
+        FQ.ProdJAN AS FQJAN,
+        FQ.BranchCD AS FQBranch,
+        FQ.Bin AS FQBin,
+        FQ.MonFixQty,
+        FQ.TueFixQty,
+        FQ.WedFixQty,
+        FQ.ThuFixQty,
+        FQ.FriFixQty,
+        FQ.SatFixQty,
+        FQ.SunFixQty,
+        0 AS DeleteFlg,
+        DDM.DeliveryStartOne,
+        DDM.DeliveryEndOne,
+        DDM.DeliveryStartTwo,
+        DDM.DeliveryEndTwo,
+        DDM.DeliveryStartThree,
+        DDM.DeliveryEndThree
+        INTO
+        #OrderQty_temp_定数
+        FROM
+        [dbOrder].[dbo].[shM_OrderListAll] OL WITH (NOLOCK)
+        INNER JOIN #product_distinct TBS
+        ON TBS.商品CD = OL.ProdJAN
+        CROSS JOIN
+        #DeliveryDates D
+        INNER JOIN
+        [dbOrder].[dbo].[shM_FixQty_test] FQ WITH (NOLOCK)
+        ON
+        OL.ProdJAN = FQ.ProdJAN
+        AND OL.BranchCD = FQ.BranchCD
+        AND OL.SupplierCD = FQ.SupplierCD
+        inner join #mt_mailcontrol mail
+        on FQ.Bin=mail.mailNo
+        and FQ.SupplierCD=mail.vendorId
+        LEFT JOIN
+        [dbOrder].[dbo].[shM_DeliveryDateMaster] DDM WITH (NOLOCK)
+        ON
+        OL.ProdJAN = DDM.ProdJAN
+        AND OL.BranchCD = DDM.BranchCD
+        WHERE
+        OL.IsStopOrder=0 and
+        FQ.OrderStartDate &lt;= @now and
+        FQ.SupplierCD = #{bo.vendorId}
+        <if test="bo.lineIds != null and bo.lineIds.length > 0">
+            AND OL.LineCD in
+            <foreach collection="bo.lineIds" open="(" separator="," close=")" item="item" index="index">
+                ${item}
+            </foreach>
+        </if>
+
+
+        DELETE Ordp
+        FROM  #OrderQty_temp_定数 Ordp
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_PcSpecialSched] shTpd WITH (NOLOCK)
+        ON
+        Ordp.DeliveryDate = shTpd.SpecialDate AND
+        Ordp.OLBranch = shTpd.BranchCD AND
+        Ordp.LineCD = shTpd.LineCD AND
+        Ordp.FQBin = shTpd.Bin AND
+        Ordp.SupplierCD = shTpd. SourceFlag
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_PcSpecialSched] shTped WITH (NOLOCK)
+        ON
+        Ordp.DeliveryDate = shTped.SpecialDate AND
+        shTpd.BranchCD = 999 AND
+        Ordp.LineCD = shTped.LineCD AND
+        Ordp.FQBin = shTped.Bin AND
+        Ordp.SupplierCD = shTped. SourceFlag
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_ProductionPlanSched] shTd WITH (NOLOCK)
+        ON
+        Ordp.OLBranch = shTd.BranchCD AND
+        Ordp.LineCD = shTd.LineCD AND
+        Ordp.FQBin = shTd.Bin AND
+        DATEPART(WEEKDAY,Ordp.DeliveryDate) = shTd.WeekDay AND
+        Ordp.SupplierCD = shTd.SourceFlag
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_ProductionPlanSched] shTed WITH (NOLOCK)
+        ON
+        shTed.BranchCD = 999 AND
+        Ordp.LineCD = shTed.LineCD AND
+        Ordp.FQBin = shTed.Bin AND
+        DATEPART(WEEKDAY,Ordp.DeliveryDate) = shTed.WeekDay AND
+        Ordp.SupplierCD = shTed.SourceFlag
+        WHERE
+        Ordp.OrderStartDate IS NOT NULL AND
+        DATEADD(DD, -1*ISNULL(ISNULL(shTpd.LockDays,ISNULL(shTped.LockDays,ISNULL(shTd.BasicLockDays,shTed.BasicLockDays))),0),Ordp.DeliveryDate) &lt; Ordp.OrderStartDate
+
+        DELETE ordp
+        FROM  #OrderQty_temp_定数 Ordp
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_PcSpecialSched] shTpd WITH (NOLOCK)
+        ON
+        Ordp.DeliveryDate = shTpd.SpecialDate AND
+        Ordp.OLBranch = shTpd.BranchCD AND
+        Ordp.LineCD = shTpd.LineCD AND
+        Ordp.FQBin = shTpd.Bin AND
+        Ordp.SupplierCD = shTpd.SourceFlag
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_PcSpecialSched] shTped WITH (NOLOCK)
+        ON
+        Ordp.DeliveryDate = shTped.SpecialDate AND
+        shTped.BranchCD = 999 AND
+        Ordp.LineCD = shTped.LineCD AND
+        Ordp.FQBin = shTped.Bin AND
+        Ordp.SupplierCD = shTped.SourceFlag
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_ProductionPlanSched] shTd WITH (NOLOCK)
+        ON
+        Ordp.OLBranch = shTd.BranchCD AND
+        Ordp.LineCD = shTd.LineCD AND
+        Ordp.FQBin = shTd.Bin AND
+        DATEPART(WEEKDAY,Ordp.DeliveryDate) = shTd.WeekDay AND
+        Ordp.SupplierCD = shTd.SourceFlag
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_ProductionPlanSched] shTed WITH (NOLOCK)
+        ON
+        shTed.BranchCD = 999 AND
+        Ordp.LineCD = shTed.LineCD AND
+        Ordp.FQBin = shTed.Bin AND
+        DATEPART(WEEKDAY,Ordp.DeliveryDate) = shTed.WeekDay AND
+        Ordp.SupplierCD = shTed.SourceFlag
+        where
+        (dateadd(day,-1*ISNULL(ISNULL(ISNULL(shTpd.LockDays,shTped.LockDays),shTd.BasicLockDays),shTed.BasicLockDays),Ordp.DeliveryDate) &lt; @start_day)
+        or
+        ((dateadd(day,-1*ISNULL(ISNULL(ISNULL(shTpd.LockDays,shTped.LockDays),shTd.BasicLockDays),shTed.BasicLockDays),Ordp.DeliveryDate) = @start_day AND
+        CONVERT(datetime,CONVERT(varchar,ISNULL(ISNULL(ISNULL(shTpd.SpecialLockTime,shTped.SpecialLockTime),shTd.BasicLockTime),shTed.BasicLockTime))) &lt; CONVERT(varchar,@now,8)))
+
+        UPDATE
+        Ordp
+        SET
+        Ordp.OrderQty = 0
+        FROM
+        #OrderQty_temp_定数 Ordp
+        INNER JOIN
+        [dbOrder].[dbo].[shT_PcOrderList] shTt WITH (NOLOCK)
+        ON
+        Ordp.OLBranch = shTt.BranchCD
+        AND Ordp.OLJAN = shTt.JAN
+        AND Ordp.FQBin = shTt.Bin
+        AND Ordp.SupplierCD = shTt.PcCode
+        WHERE shTt.EndDate IS NOT NULL
+        AND Ordp.DeliveryDate &gt;= shTt.EndDate
+        AND shTt.EndDate &gt;= DATEADD(DD,-7,@now)
+
+
+        -- 定数より普通と重複分を削除
+        DELETE 定数
+        FROM
+        #OrderQty_temp_定数 定数
+        INNER JOIN
+        #OrderQty_temp_普通 普通
+        ON
+        定数.OLJAN = 普通.OLJAN
+        AND 定数.OLBranch = 普通.OLBranch
+        AND 定数.FQBin = 普通.OQBin
+        AND 定数.DeliveryDate = 普通.DeliveryDate
+
+
+        -- ３つの発注データを統合する。
+        SELECT *
+        INTO #OrderQty_Temp
+        FROM #OrderQty_temp_普通
+        UNION ALL
+        SELECT * FROM #OrderQty_temp_客注
+        UNION ALL
+        SELECT
+        OLJAN,
+        ProdName,
+        OLBranch,
+        LineCD,
+        SupplierCD,
+        LogicFlg,
+        OQJAN,
+        OQBranch,
+        DeliveryDate,
+        OQBin,
+        UserCD,
+        OrderQty,
+        FQJAN,
+        FQBranch,
+        FQBin,
+        MonFixQty,
+        TueFixQty,
+        WedFixQty,
+        ThuFixQty,
+        FriFixQty,
+        SatFixQty,
+        SunFixQty,
+        DeliveryStartOne,
+        DeliveryEndOne,
+        DeliveryStartTwo,
+        DeliveryEndTwo,
+        DeliveryStartThree,
+        DeliveryEndThree
+        FROM #OrderQty_temp_定数
+        WHERE OrderQty is not null
+
+        -- 発注データより九州外注除外分を削除
+        DELETE OQT
+        FROM #OrderQty_Temp OQT
+        INNER JOIN #view OP
+        ON OQT.OLJAN = OP.商品CD
+        AND OQT.OLBranch = OP.店CD
+
+
+
+        -- 納品開始日と納品終了日の追加
+        UPDATE #OrderQty_Temp
+        SET OrderQty = 0
+        WHERE DeliveryDate &gt; ISNULL(DeliveryEndThree,'2999/12/31')
+
+
+
+        -- 納品開始日と納品終了日の追加
+        UPDATE #OrderQty_Temp
+        SET OrderQty = 0
+        WHERE
+        DeliveryDate &gt; ISNULL(DeliveryEndTwo,'2999/12/31')
+        AND DeliveryDate &lt; ISNULL(DeliveryStartThree,'2999/12/31')
+
+
+        -- 納品開始日と納品終了日の追加
+        UPDATE #OrderQty_Temp
+        SET OrderQty = 0
+        WHERE
+        DeliveryDate &gt; ISNULL(DeliveryEndOne,'2999/12/31')
+        AND DeliveryDate &lt; ISNULL(DeliveryStartTwo,'2999/12/31')
+
+
+
+        -- 納品開始日と納品終了日の追加
+        UPDATE #OrderQty_Temp
+        SET OrderQty = 0
+        WHERE DeliveryDate &lt; ISNULL(DeliveryStartOne,'1900/01/01')
+
+
+        -- 閉店処理を行って検索対象のテーブルとする。
+        SELECT
+        DeliveryDate,
+        isnull(OQBin,FQBin) AS Bin,
+        OLBranch AS BranchCD,
+        OLJAN AS ProductCD,
+        LineCD,
+        OrderQty,
+        SupplierCD
+        INTO #search_table
+        FROM
+        #OrderQty_Temp OQ
+        INNER JOIN
+        [dbOrder].[dbo].[shM_Branch] B WITH (NOLOCK)
+        ON
+        OQ.OLBranch = B.BranchCD
+
+    </sql>
+
+    <select id="getOrderStatusList" parameterType="com.tre.centralkitchen.domain.dto.OrderStatusDto" resultMap="total, orderStatusVo">
+        <include refid="sqlOrderStatus"/>
+        -- 返却データの整形
+        <choose>
+            <when test="bo.displayFormat == 1">
+                SELECT
+                ROW_NUMBER() OVER(ORDER BY SE.SupplierCD, SE.DeliveryDate, ML.seq, SE.LineCD, MWG.seq, MWG.id, ISNULL(PDS.呼出品番,PDA.呼出品番), SE.ProductCD) as id,
+                SE.SupplierCD AS supplierCD,
+                MAX(SP.SupplierName) AS supplierName,
+                '-' AS mailNo,
+                SE.LineCD AS LineID,
+                MAX(LI.LineName) AS LineName,
+                MAX(ISNULL(PDS.作業グループCD,PDA.作業グループCD)) AS workGroupID,
+                MAX(MWG.name) AS WorkGroupName,
+                SE.ProductCD AS jan,
+                ISNULL(PDS.呼出品番,PDA.呼出品番) AS callCd,
+                MAX(ISNULL(PDS.商品名,PDA.商品名)) AS productName,
+                ISNULL(PDS.規格,PDA.規格) AS itemSpecs,
+                ISNULL(PDS.標準内容量,PDA.標準内容量) AS itemContent,
+                CAST(SUM(SE.OrderQty) as DECIMAL(10,0)) AS orderQty,
+                CONVERT(VARCHAR(12),SE.DeliveryDate,111) AS deliveryDate
+                INTO #all_result
+                FROM
+                #search_table AS SE
+                LEFT JOIN #mt_mailcontrol AS MC
+                ON MC.centerId = #{bo.centerId}
+                AND MC.mailNo = SE.Bin
+                LEFT JOIN
+                [dbOrder].[dbo].[shM_SupplierPC] AS SP WITH (NOLOCK)
+                ON
+                SE.SupplierCD = SP.SupplierCD
+                LEFT JOIN
+                [MasterDB].[dbo].[lines] AS LI WITH (NOLOCK)
+                ON
+                SE.LineCD = LI.LineCD
+                LEFT JOIN dbOrder.dbo.MtUseLine AS ML WITH (NOLOCK)
+                ON
+                ML.line_id = LI.LineCD
+                LEFT JOIN
+                [MasterDB].[dbo].[PurchaseGroupBranches] AS ST WITH (NOLOCK)
+                ON
+                SE.BranchCD = ST.BranchCD
+                LEFT JOIN #product_store PDS
+                ON PDS.商品CD = SE.ProductCD
+                AND PDS.地域CD = ST.PurchaseGroupCD
+                AND PDS.店CD = SE.BranchCD
+                LEFT JOIN #product_area PDA
+                ON PDA.商品CD = SE.ProductCD
+                AND PDA.地域CD = ST.PurchaseGroupCD
+                AND PDA.店CD = 0
+                INNER JOIN #mt_workgroup MWG
+                ON MWG.centerId = #{bo.centerId}
+                AND MWG.LineId = LI.LineCD
+                AND MWG.id = ISNULL(PDS.作業グループCD,PDA.作業グループCD)
+                WHERE
+                SE.OrderQty &gt; 0 AND
+                SE.OrderQty IS NOT NULL
+                <if test="bo.jan != null and '' != bo.jan">
+                    AND SE.ProductCD = #{bo.jan}
+                </if>
+                <if test="bo.callCd != null">
+                    AND ISNULL(PDS.呼出品番,PDA.呼出品番) = #{bo.callCd}
+                </if>
+                <if test="bo.productName != null and '' != bo.productName">
+                    AND (ISNULL(PDS.商品名,PDA.商品名) like '%${bo.productName}%' or ISNULL(PDS.商品名,PDA.商品名) like '%${bo.productName}%')
+                </if>
+                GROUP BY SE.SupplierCD, SE.DeliveryDate, ML.seq, SE.LineCD, MWG.seq, MWG.id, ISNULL(PDS.呼出品番,PDA.呼出品番), SE.ProductCD,
+                ISNULL(PDS.規格,PDA.規格),
+                ISNULL(PDS.標準内容量,PDA.標準内容量)
+                ORDER BY SE.SupplierCD, SE.DeliveryDate, ML.seq, SE.LineCD, MWG.seq, MWG.id, ISNULL(PDS.呼出品番,PDA.呼出品番), SE.ProductCD
+            </when>
+            <otherwise>
+                SELECT
+                ROW_NUMBER() OVER(ORDER BY SE.SupplierCD, SE.DeliveryDate, MC.seq, SE.Bin, ML.seq, SE.LineCD, MWG.seq, MWG.id, ISNULL(PDS.呼出品番,PDA.呼出品番), SE.ProductCD) as id,
+                SE.SupplierCD AS supplierCD,
+                MAX(SP.SupplierName) AS supplierName,
+                cast(SE.Bin as varchar)+'便' AS mailNo,
+                SE.LineCD AS LineID,
+                MAX(LI.LineName) AS LineName,
+                MAX(ISNULL(PDS.作業グループCD,PDA.作業グループCD)) AS workGroupID,
+                MAX(MWG.name) AS WorkGroupName,
+                SE.ProductCD AS jan,
+                ISNULL(PDS.呼出品番,PDA.呼出品番) AS callCd,
+                MAX(ISNULL(PDS.商品名,PDA.商品名)) AS productName,
+                ISNULL(PDS.規格,PDA.規格) AS itemSpecs,
+                ISNULL(PDS.標準内容量,PDA.標準内容量) AS itemContent,
+                CAST(SUM(SE.OrderQty) as DECIMAL(10,0)) AS orderQty,
+                CONVERT(VARCHAR(12),SE.DeliveryDate,111) AS deliveryDate
+                INTO #all_result
+                FROM
+                #search_table AS SE
+                LEFT JOIN #mt_mailcontrol AS MC
+                ON MC.centerId = #{bo.centerId}
+                AND MC.mailNo = SE.Bin
+                LEFT JOIN
+                [dbOrder].[dbo].[shM_SupplierPC] AS SP WITH (NOLOCK)
+                ON
+                SE.SupplierCD = SP.SupplierCD
+                LEFT JOIN
+                [MasterDB].[dbo].[lines] AS LI WITH (NOLOCK)
+                ON
+                SE.LineCD = LI.LineCD
+                LEFT JOIN dbOrder.dbo.MtUseLine AS ML WITH (NOLOCK)
+                ON
+                ML.line_id = LI.LineCD
+                LEFT JOIN
+                [MasterDB].[dbo].[PurchaseGroupBranches] AS ST WITH (NOLOCK)
+                ON
+                SE.BranchCD = ST.BranchCD
+                LEFT JOIN #product_store PDS
+                ON PDS.商品CD = SE.ProductCD
+                AND PDS.地域CD = ST.PurchaseGroupCD
+                AND PDS.店CD = SE.BranchCD
+                LEFT JOIN #product_area PDA
+                ON PDA.商品CD = SE.ProductCD
+                AND PDA.地域CD = ST.PurchaseGroupCD
+                AND PDA.店CD = 0
+                INNER JOIN #mt_workgroup MWG
+                ON MWG.centerId = #{bo.centerId}
+                AND MWG.LineId = LI.LineCD
+                AND MWG.id = ISNULL(PDS.作業グループCD,PDA.作業グループCD)
+                WHERE
+                SE.OrderQty &gt; 0 AND
+                SE.OrderQty IS NOT NULL
+                <if test="bo.jan != null and '' != bo.jan">
+                    AND SE.ProductCD = #{bo.jan}
+                </if>
+                <if test="bo.callCd != null">
+                    AND ISNULL(PDS.呼出品番,PDA.呼出品番) = #{bo.callCd}
+                </if>
+                <if test="bo.productName != null and '' != bo.productName">
+                    AND (ISNULL(PDS.商品名,PDA.商品名) like '%${bo.productName}%' or ISNULL(PDS.商品名,PDA.商品名) like '%${bo.productName}%')
+                </if>
+                GROUP BY SE.SupplierCD, SE.DeliveryDate, MC.seq, SE.Bin, ML.seq, SE.LineCD, MWG.seq, MWG.id, ISNULL(PDS.呼出品番,PDA.呼出品番), SE.ProductCD,
+                ISNULL(PDS.規格,PDA.規格),
+                ISNULL(PDS.標準内容量,PDA.標準内容量)
+                ORDER BY SE.SupplierCD, SE.DeliveryDate, MC.seq, SE.Bin, ML.seq, SE.LineCD, MWG.seq, MWG.id, ISNULL(PDS.呼出品番,PDA.呼出品番), SE.ProductCD
+            </otherwise>
+        </choose>
+        <choose>
+            <when test="bo.pageSize != null and bo.pageNum != null">
+                select count(1) as total, #{bo.pageSize} as size, #{bo.pageNum} as [current],
+                CEILING(1.0*count(1)/#{bo.pageSize}) as pages , sum(orderQty) as orderSum from #all_result;
+                select
+                supplierName, mailNo, LineName, workGroupName, jan, callCd, productName,
+                itemSpecs,
+                itemContent,orderQty, deliveryDate
+                from #all_result
+                where id &gt; (#{bo.pageNum} - 1)*#{bo.pageSize} and id &lt;= #{bo.pageNum}*#{bo.pageSize};
+            </when>
+            <otherwise>
+                select count(1) as total, 0 as size, 1 as [current], 1 as pages , sum(orderQty) as orderSum from #all_result;
+                select
+                supplierName, mailNo, LineName, workGroupName, jan, callCd, productName,
+                itemSpecs,
+                itemContent,orderQty, deliveryDate
+                from #all_result ;
+            </otherwise>
+        </choose>
+
+
+        drop table #DeliveryDates;
+        drop table #product;
+        drop table #product_area;
+        drop table #product_store;
+        drop table #product_distinct;
+        drop table #view;
+        drop table #mt_mailcontrol;
+        drop table #mt_workgroup;
+        drop table #OrderQty_temp_普通;
+        drop table #OrderQty_temp_客注;
+        drop table #OrderQty_temp_定数;
+        drop table #OrderQty_Temp;
+        drop table #temp;
+        drop table #search_table;
+        drop table #all_result;
+    </select>
+
+    <select id="getOrderStatusListStore" parameterType="com.tre.centralkitchen.domain.dto.OrderStatusDto" resultMap="total, orderStatusStoreVo">
+        <include refid="sqlOrderStatus"/>
+        -- 返却データの整形
+        SELECT
+        ROW_NUMBER() OVER(ORDER BY SE.SupplierCD, SE.DeliveryDate, MC.seq, SE.Bin, ML.seq, SE.LineCD, MWG.seq, MWG.id, ISNULL(PDS.呼出品番,PDA.呼出品番), SE.ProductCD,SE.BranchCD,BR.BranchName,BR.BranchName_abbr) as id,
+        SE.SupplierCD AS supplierCD,
+        MAX(SP.SupplierName) AS supplierName,
+        cast(SE.Bin as varchar)+'便' AS mailNo,
+        SE.LineCD AS LineID,
+        MAX(LI.LineName) AS LineName,
+        MAX(ISNULL(PDS.作業グループCD,PDA.作業グループCD)) AS workGroupID,
+        MAX(MWG.name) AS WorkGroupName,
+        SE.ProductCD AS jan,
+        ISNULL(PDS.呼出品番,PDA.呼出品番) AS callCd,
+        MAX(ISNULL(PDS.商品名,PDA.商品名)) AS productName,
+        ISNULL(PDS.規格,PDA.規格) AS itemSpecs,
+        ISNULL(PDS.標準内容量,PDA.標準内容量) AS itemContent,
+        CAST(SUM(SE.OrderQty) as DECIMAL(10,0)) AS orderQty,
+        CONVERT(VARCHAR(12),SE.DeliveryDate,111) AS deliveryDate,
+        SE.BranchCD,
+        BR.BranchName,
+        BR.BranchName_abbr AS BranchNameAbbr
+        INTO #all_result
+        FROM
+        #search_table AS SE
+        LEFT JOIN #mt_mailcontrol AS MC
+        ON MC.centerId = #{bo.centerId}
+        AND MC.mailNo = SE.Bin
+        LEFT JOIN
+        [dbOrder].[dbo].[shM_SupplierPC] AS SP WITH (NOLOCK)
+        ON
+        SE.SupplierCD = SP.SupplierCD
+        LEFT JOIN
+        [MasterDB].[dbo].[lines] AS LI WITH (NOLOCK)
+        ON
+        SE.LineCD = LI.LineCD
+        LEFT JOIN dbOrder.dbo.MtUseLine AS ML WITH (NOLOCK)
+        ON
+        ML.line_id = LI.LineCD
+        LEFT JOIN
+        [MasterDB].[dbo].[PurchaseGroupBranches] AS ST WITH (NOLOCK)
+        ON
+        SE.BranchCD = ST.BranchCD
+        LEFT JOIN #product_store PDS
+        ON PDS.商品CD = SE.ProductCD
+        AND PDS.地域CD = ST.PurchaseGroupCD
+        AND PDS.店CD = SE.BranchCD
+        LEFT JOIN #product_area PDA
+        ON PDA.商品CD = SE.ProductCD
+        AND PDA.地域CD = ST.PurchaseGroupCD
+        AND PDA.店CD = 0
+        INNER JOIN #mt_workgroup MWG
+        ON MWG.centerId = #{bo.centerId}
+        AND MWG.LineId = LI.LineCD
+        AND MWG.id = ISNULL(PDS.作業グループCD,PDA.作業グループCD)
+        LEFT JOIN [MasterDB].[dbo].[Branches] BR
+        ON SE.BranchCD=BR.BranchCD
+        WHERE
+        SE.OrderQty &gt; 0 AND
+        SE.OrderQty IS NOT NULL
+        <if test="bo.jan != null and '' != bo.jan">
+            AND SE.ProductCD = #{bo.jan}
+        </if>
+        <if test="bo.callCd != null">
+            AND ISNULL(PDS.呼出品番,PDA.呼出品番) = #{bo.callCd}
+        </if>
+        <if test="bo.productName != null and '' != bo.productName">
+            AND (ISNULL(PDS.商品名,PDA.商品名) like '%${bo.productName}%' or ISNULL(PDS.商品名,PDA.商品名) like '%${bo.productName}%')
+        </if>
+        GROUP BY SE.SupplierCD, SE.DeliveryDate, MC.seq, SE.Bin, ML.seq, SE.LineCD, MWG.seq, MWG.id, ISNULL(PDS.呼出品番,PDA.呼出品番), SE.ProductCD,SE.BranchCD,BR.BranchName,BR.BranchName_abbr,
+        ISNULL(PDS.規格,PDA.規格),
+        ISNULL(PDS.標準内容量,PDA.標準内容量)
+        ORDER BY SE.SupplierCD, SE.DeliveryDate, MC.seq, SE.Bin, ML.seq, SE.LineCD, MWG.seq, MWG.id, ISNULL(PDS.呼出品番,PDA.呼出品番), SE.ProductCD,SE.BranchCD,BR.BranchName,BR.BranchName_abbr
+
+        <choose>
+            <when test="bo.pageSize != null and bo.pageNum != null">
+                select count(1) as total, #{bo.pageSize} as size, #{bo.pageNum} as [current],
+                CEILING(1.0*count(1)/#{bo.pageSize}) as pages, sum(orderQty) as orderSum from #all_result;
+                select
+                supplierName, mailNo, LineName, workGroupName, jan, callCd, productName,
+                itemSpecs,
+                itemContent,orderQty, deliveryDate,BranchCD,BranchName,BranchNameAbbr
+                from #all_result
+                where id &gt; (#{bo.pageNum} - 1)*#{bo.pageSize} and id &lt;= #{bo.pageNum}*#{bo.pageSize};
+            </when>
+            <otherwise>
+                select count(1) as total, 0 as size, 1 as [current], 1 as pages, sum(orderQty) as orderSum from #all_result;
+                select
+                supplierName, mailNo, LineName, workGroupName, jan, callCd, productName,
+                itemSpecs,
+                itemContent,orderQty, deliveryDate,BranchCD,BranchName,BranchNameAbbr
+                from #all_result ;
+            </otherwise>
+        </choose>
+
+
+        drop table #DeliveryDates;
+        drop table #product;
+        drop table #product_area;
+        drop table #product_store;
+        drop table #product_distinct;
+        drop table #view;
+        drop table #mt_mailcontrol;
+        drop table #mt_workgroup;
+        drop table #OrderQty_temp_普通;
+        drop table #OrderQty_temp_客注;
+        drop table #OrderQty_temp_定数;
+        drop table #OrderQty_Temp;
+        drop table #temp;
+        drop table #search_table;
+        drop table #all_result;
+    </select>
+
+    <select id="getProducePlan" parameterType="com.tre.centralkitchen.domain.dto.OrderStatusDto" resultType="com.tre.centralkitchen.domain.vo.system.ProducePlanVo">
+        DECLARE @start_day AS VARCHAR(10) = dateadd(day,1,getdate())
+        DECLARE @end_day AS VARCHAR(10)= dateadd(day,7,getdate())
+        DECLARE @now DATETIME= CONVERT(varchar,GETDATE(),111)
+
+
+        set @start_day = #{bo.deliveryStartDate}
+        set @end_day = #{bo.deliveryEndDate}
+
+        DECLARE @days AS INT
+        -- 定数発注データを取得時にcross joinする日付データ
+        CREATE TABLE #DeliveryDates
+        (
+        DeliveryDate DATETIME
+        )   ON [PRIMARY]
+
+        DECLARE @count AS INT
+        SET @count = 0
+        SET @days = DATEDIFF(DD,@start_day,@end_day)
+
+        WHILE @count &lt;= @days
+        BEGIN
+        INSERT INTO #DeliveryDates
+        VALUES(DATEADD(DD,@count,@start_day))
+        SET @count = @count + 1
+        END
+
+        create table #product(
+        商品CD varchar(13) ,
+        地域CD int ,
+        店CD int,
+        グループCD int,
+        呼出品番 int,
+        商品名 varchar(50),
+        商品名カナ varchar(50),
+        作業グループCD int
+        )
+
+        create clustered index ix_clu_for_product on #product(商品CD,地域CD,店CD)
+        insert into #product
+        select
+        商品CD,地域CD,店CD,
+        グループCD,
+        呼出品番,
+        商品名,
+        商品名カナ,
+        作業グループCD
+        from [${ip120}].[PF_Master].[dbo].[T_M商品] t
+        where (ベンダーCD =#{bo.vendorId} or PC対象=2)
+        <if test="bo.lineIds != null and bo.lineIds.length > 0">
+            and t.グループCD in
+            <foreach collection="bo.lineIds" open="(" separator="," close=")" item="item" index="index">
+                ${item}
+            </foreach>
+        </if>
+        <if test="bo.jan != null and '' != bo.jan">
+            AND t.商品CD = #{bo.jan}
+        </if>
+        <if test="bo.callCd != null">
+            AND t.呼出品番 = #{bo.callCd}
+        </if>
+        <if test="bo.productName != null and '' != bo.productName">
+            AND (t.商品名 like '%${bo.productName}%' or t.商品名カナ like '%${bo.productName}%')
+        </if>
+        and t.廃盤区分!=9
+
+        create table #product_area(
+        商品CD varchar(13) ,
+        地域CD int ,
+        店CD int,
+        グループCD int,
+        呼出品番 int,
+        商品名 varchar(50),
+        商品名カナ varchar(50),
+        作業グループCD int
+        )
+        create clustered index ix_clu_for_product_area on #product_area(商品CD,グループCD,地域CD)
+
+        create table #product_store(
+        商品CD varchar(13) ,
+        地域CD int ,
+        店CD int,
+        グループCD int,
+        呼出品番 int,
+        商品名 varchar(50),
+        商品名カナ varchar(50),
+        作業グループCD int
+        )
+        create clustered index ix_clu_for_store on #product_store(商品CD,店CD)
+
+        insert into #product_area
+        select
+        商品CD,地域CD,店CD,
+        グループCD,
+        呼出品番,
+        商品名,
+        商品名カナ,
+        作業グループCD
+        from #product where 店CD=0
+
+        insert into #product_store
+        select
+        商品CD,地域CD,店CD,
+        グループCD,
+        呼出品番,
+        商品名,
+        商品名カナ,
+        作業グループCD
+        from #product where 店CD &lt;&gt; 0
+
+        create table #product_distinct(
+        商品CD varchar(13) ,
+        グループCD int
+        )
+        create clustered index ix_clu_for_product_distinct on #product_distinct(商品CD,グループCD)
+        insert into #product_distinct
+        select
+        distinct
+        商品CD
+        ,グループCD
+        from #product
+
+        CREATE table #view(
+        店CD int ,
+        商品CD varchar(13)
+        )
+
+        create clustered index ix_clu_for_view on #view(店CD,商品CD)
+        insert into #view
+        select
+        VO.店CD,
+        VO.商品CD
+        from [${ip20}].[PCSubContract].dbo.[View_外注商品有効リスト] VO WITH (NOLOCK)
+
+        CREATE TABLE #mt_mailcontrol(
+        centerId int NOT NULL,
+        vendorId int NOT NULL,
+        mailNo int NOT NULL,
+        leadtime int NOT NULL
+        )
+
+        <if test="bo.mailControlList != null and bo.mailControlList.size > 0">
+            insert into #mt_mailcontrol
+            (centerId, vendorId, mailNo, leadtime)
+            values
+            <foreach collection="bo.mailControlList" index="index" item="item" open="" close="" separator=",">
+                (#{item.centerId}, #{bo.vendorId}, #{item.mailNo}, #{item.leadtime})
+            </foreach>
+            ;
+        </if>
+
+
+
+        -- 普通発注分データの取得
+        SELECT
+        OQ.ProdJAN AS OLJAN,
+        '' AS  ProdName,
+        OQ.BranchCD AS OLBranch,
+        TBS.グループCD AS LineCD,
+        OQ.SupplierCD,
+        0 as LogicFlg,
+        OQ.ProdJAN AS OQJAN,
+        OQ.BranchCD AS OQBranch,
+        OQ.DeliveryDate,
+        OQ.Bin AS OQBin,
+        OQ.UserCD,
+        ISNULL(OQ.OrderQty,OQ.RecQuantity) OrderQty,
+        CONVERT(VARCHAR(13),NULL) AS FQJAN,
+        NULL AS FQBranch,
+        NULL AS FQBin,
+        NULL AS MonFixQty,
+        NULL AS TueFixQty,
+        NULL AS WedFixQty,
+        NULL AS ThuFixQty,
+        NULL AS FriFixQty,
+        NULL AS SatFixQty,
+        NULL AS SunFixQty,
+        DDM.DeliveryStartOne,
+        DDM.DeliveryEndOne,
+        DDM.DeliveryStartTwo,
+        DDM.DeliveryEndTwo,
+        DDM.DeliveryStartThree,
+        DDM.DeliveryEndThree
+        INTO
+        #OrderQty_temp_普通
+        FROM
+        [dbOrder].[dbo].[shT_OrderQty_test] OQ WITH (NOLOCK)
+        INNER JOIN [dbOrder].[dbo].[shM_OrderListAll] OL WITH (NOLOCK)
+        ON OQ.ProdJAN = OL.ProdJAN
+        AND OQ.BranchCD = OL.BranchCD
+        AND OQ.SupplierCD = OL.SupplierCD
+        inner join #mt_mailcontrol mail
+        on OQ.Bin=mail.mailNo
+        and OQ.SupplierCD=mail.vendorId
+        INNER JOIN #product_distinct TBS
+        ON TBS.商品CD = OQ.ProdJAN
+        LEFT JOIN
+        [dbOrder].[dbo].[shM_DeliveryDateMaster] DDM WITH (NOLOCK)
+        ON
+        OQ.ProdJAN = DDM.ProdJAN
+        AND OQ.BranchCD = DDM.BranchCD
+        WHERE
+        OQ.SupplierCD = #{bo.vendorId}
+        AND OQ.DeliveryDate BETWEEN @start_day AND @end_day
+        AND (OQ.OrderQty IS NOT NULL OR OQ.RecQuantity IS NOT NULL)
+        <if test="bo.lineIds != null and bo.lineIds.length > 0">
+            AND TBS.グループCD in
+            <foreach collection="bo.lineIds" open="(" separator="," close=")" item="item" index="index">
+                ${item}
+            </foreach>
+        </if>
+
+        -- 客注データの取得
+        SELECT
+        OQ.ProdJAN AS OLJAN,
+        '' AS  ProdName,
+        OQ.BranchCD AS OLBranch,
+        TBS.グループCD AS LineCD,
+        OQ.SupplierCD,
+        0 as LogicFlg,
+        OQ.ProdJAN AS OQJAN,
+        OQ.BranchCD AS OQBranch,
+        OQ.DeliveryDate,
+        MM.Bin AS OQBin,
+        0 AS UserCD,
+        OQ.CustOrderQty AS OrderQty,
+        DDM.DeliveryStartOne,
+        DDM.DeliveryEndOne,
+        DDM.DeliveryStartTwo,
+        DDM.DeliveryEndTwo,
+        DDM.DeliveryStartThree,
+        DDM.DeliveryEndThree
+        INTO #temp
+        FROM
+        [dbOrder].[dbo].[shT_OrderQty_test] OQ WITH (NOLOCK)
+        INNER JOIN [dbOrder].[dbo].[shM_OrderListAll] OL WITH (NOLOCK)
+        ON OQ.ProdJAN = OL.ProdJAN
+        AND OQ.BranchCD = OL.BranchCD
+        AND OQ.SupplierCD = OL.SupplierCD
+        INNER JOIN #product_distinct TBS
+        ON TBS.商品CD = OQ.ProdJAN
+        INNER JOIN (
+        SELECT
+        Distinct
+        TM.mailNo AS 便,
+        BN.Bin AS Bin
+        FROM #mt_mailcontrol TM
+        INNER JOIN
+        [dbOrder].[dbo].[shM_CustOrderBin] BN WITH (NOLOCK)
+        ON TM.LeadTime = BN.LeadTime
+        WHERE BN.PcCode = #{bo.vendorId}
+        ) MM
+        ON OQ.Bin = MM.便
+        LEFT JOIN
+        [dbOrder].[dbo].[shM_DeliveryDateMaster] DDM WITH (NOLOCK)
+        ON OQ.ProdJAN = DDM.ProdJAN
+        AND OQ.BranchCD = DDM.BranchCD
+        WHERE
+        OQ.SupplierCD = #{bo.vendorId}
+        AND DeliveryDate BETWEEN @start_day AND @end_day
+        AND OQ.CustOrderQty IS NOT NULL
+        <if test="bo.lineIds != null and bo.lineIds.length > 0">
+            AND TBS.グループCD in
+            <foreach collection="bo.lineIds" open="(" separator="," close=")" item="item" index="index">
+                ${item}
+            </foreach>
+        </if>
+
+
+        -- 客注の合算
+        SELECT
+        OLJAN,
+        ProdName,
+        OLBranch,
+        LineCD,
+        SupplierCD,
+        LogicFlg,
+        OQJAN,
+        OQBranch,
+        DeliveryDate,
+        OQBin,
+        UserCD,
+        SUM(OrderQty) AS OrderQty,
+        CONVERT(VARCHAR(13),NULL) AS FQJAN,
+        NULL AS FQBranch,
+        NULL AS FQBin,
+        NULL AS MonFixQty,
+        NULL AS TueFixQty,
+        NULL AS WedFixQty,
+        NULL AS ThuFixQty,
+        NULL AS FriFixQty,
+        NULL AS SatFixQty,
+        NULL AS SunFixQty,
+        DeliveryStartOne,
+        DeliveryEndOne,
+        DeliveryStartTwo,
+        DeliveryEndTwo,
+        DeliveryStartThree,
+        DeliveryEndThree
+        INTO #OrderQty_temp_客注
+        FROM #temp
+        GROUP BY
+        OLJAN,
+        ProdName,
+        OLBranch,
+        LineCD,
+        SupplierCD,
+        LogicFlg,
+        OQJAN,
+        OQBranch,
+        DeliveryDate,
+        OQBin,
+        UserCD,
+        DeliveryStartOne,
+        DeliveryEndOne,
+        DeliveryStartTwo,
+        DeliveryEndTwo,
+        DeliveryStartThree,
+        DeliveryEndThree
+
+
+        -- 定数発注データの取得
+        SELECT
+        DISTINCT
+        OL.ProdJAN AS OLJAN,
+        OL.ProdName,
+        OL.BranchCD AS OLBranch,
+        OL.LineCD,
+        OL.SupplierCD,
+        OL.LogicFlg,
+        CONVERT(VARCHAR(13),NULL) AS OQJAN,
+        NULL AS OQBranch,
+        D.DeliveryDate,
+        NULL AS OQBin,
+        FQ.UserCD,
+        FQ.OrderStartDate,
+
+        CASE
+        WHEN FQ.OrderStartDate &lt;= @now
+        THEN
+        CASE
+        DATEPART(WEEKDAY,D.DeliveryDate)
+        WHEN 1
+        THEN
+        CASE
+        WHEN FQ.SunFixQty IS NULL
+        THEN 0
+        ELSE FQ.SunFixQty
+        END
+        WHEN 2
+        THEN
+        CASE
+        WHEN FQ.MonFixQty IS NULL
+        THEN 0
+        ELSE FQ.MonFixQty
+        END
+        WHEN 3
+        THEN
+        CASE
+        WHEN FQ.TueFixQty IS NULL
+        THEN 0
+        ELSE FQ.TueFixQty
+        END
+        WHEN 4
+        THEN
+        CASE
+        WHEN FQ.WedFixQty IS NULL
+        THEN 0
+        ELSE FQ.WedFixQty
+        END
+        WHEN 5
+        THEN
+        CASE
+        WHEN FQ.ThuFixQty IS NULL
+        THEN 0
+        ELSE FQ.ThuFixQty
+        END
+        WHEN 6
+        THEN
+        CASE
+        WHEN FQ.FriFixQty IS NULL
+        THEN 0
+        ELSE FQ.FriFixQty
+        END
+        WHEN 7
+        THEN
+        CASE
+        WHEN FQ.SatFixQty IS NULL
+        THEN 0
+        ELSE FQ.SatFixQty
+        END
+        END
+        WHEN FQ.OrderStartDate &gt; @now
+        THEN 0
+        END AS OrderQty,
+        FQ.ProdJAN AS FQJAN,
+        FQ.BranchCD AS FQBranch,
+        FQ.Bin AS FQBin,
+        FQ.MonFixQty,
+        FQ.TueFixQty,
+        FQ.WedFixQty,
+        FQ.ThuFixQty,
+        FQ.FriFixQty,
+        FQ.SatFixQty,
+        FQ.SunFixQty,
+        0 AS DeleteFlg,
+        DDM.DeliveryStartOne,
+        DDM.DeliveryEndOne,
+        DDM.DeliveryStartTwo,
+        DDM.DeliveryEndTwo,
+        DDM.DeliveryStartThree,
+        DDM.DeliveryEndThree
+        INTO
+        #OrderQty_temp_定数
+        FROM
+        [dbOrder].[dbo].[shM_OrderListAll] OL WITH (NOLOCK)
+        INNER JOIN #product_distinct TBS
+        ON TBS.商品CD = OL.ProdJAN
+        CROSS JOIN
+        #DeliveryDates D
+        INNER JOIN
+        [dbOrder].[dbo].[shM_FixQty_test] FQ WITH (NOLOCK)
+        ON
+        OL.ProdJAN = FQ.ProdJAN
+        AND OL.BranchCD = FQ.BranchCD
+        AND OL.SupplierCD = FQ.SupplierCD
+        inner join #mt_mailcontrol mail
+        on FQ.Bin=mail.mailNo
+        and FQ.SupplierCD=mail.vendorId
+        LEFT JOIN
+        [dbOrder].[dbo].[shM_DeliveryDateMaster] DDM WITH (NOLOCK)
+        ON
+        OL.ProdJAN = DDM.ProdJAN
+        AND OL.BranchCD = DDM.BranchCD
+        WHERE
+        OL.IsStopOrder=0 and
+        FQ.OrderStartDate &lt;= @now and
+        FQ.SupplierCD = #{bo.vendorId}
+        <if test="bo.lineIds != null and bo.lineIds.length > 0">
+            AND OL.LineCD in
+            <foreach collection="bo.lineIds" open="(" separator="," close=")" item="item" index="index">
+                ${item}
+            </foreach>
+        </if>
+
+
+        DELETE Ordp
+        FROM  #OrderQty_temp_定数 Ordp
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_PcSpecialSched] shTpd WITH (NOLOCK)
+        ON
+        Ordp.DeliveryDate = shTpd.SpecialDate AND
+        Ordp.OLBranch = shTpd.BranchCD AND
+        Ordp.LineCD = shTpd.LineCD AND
+        Ordp.FQBin = shTpd.Bin AND
+        Ordp.SupplierCD = shTpd. SourceFlag
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_PcSpecialSched] shTped WITH (NOLOCK)
+        ON
+        Ordp.DeliveryDate = shTped.SpecialDate AND
+        shTpd.BranchCD = 999 AND
+        Ordp.LineCD = shTped.LineCD AND
+        Ordp.FQBin = shTped.Bin AND
+        Ordp.SupplierCD = shTped. SourceFlag
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_ProductionPlanSched] shTd WITH (NOLOCK)
+        ON
+        Ordp.OLBranch = shTd.BranchCD AND
+        Ordp.LineCD = shTd.LineCD AND
+        Ordp.FQBin = shTd.Bin AND
+        DATEPART(WEEKDAY,Ordp.DeliveryDate) = shTd.WeekDay AND
+        Ordp.SupplierCD = shTd.SourceFlag
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_ProductionPlanSched] shTed WITH (NOLOCK)
+        ON
+        shTed.BranchCD = 999 AND
+        Ordp.LineCD = shTed.LineCD AND
+        Ordp.FQBin = shTed.Bin AND
+        DATEPART(WEEKDAY,Ordp.DeliveryDate) = shTed.WeekDay AND
+        Ordp.SupplierCD = shTed.SourceFlag
+        WHERE
+        Ordp.OrderStartDate IS NOT NULL AND
+        DATEADD(DD, -1*ISNULL(ISNULL(shTpd.LockDays,ISNULL(shTped.LockDays,ISNULL(shTd.BasicLockDays,shTed.BasicLockDays))),0),Ordp.DeliveryDate) &lt; Ordp.OrderStartDate
+
+        DELETE ordp
+        FROM  #OrderQty_temp_定数 Ordp
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_PcSpecialSched] shTpd WITH (NOLOCK)
+        ON
+        Ordp.DeliveryDate = shTpd.SpecialDate AND
+        Ordp.OLBranch = shTpd.BranchCD AND
+        Ordp.LineCD = shTpd.LineCD AND
+        Ordp.FQBin = shTpd.Bin AND
+        Ordp.SupplierCD = shTpd.SourceFlag
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_PcSpecialSched] shTped WITH (NOLOCK)
+        ON
+        Ordp.DeliveryDate = shTped.SpecialDate AND
+        shTped.BranchCD = 999 AND
+        Ordp.LineCD = shTped.LineCD AND
+        Ordp.FQBin = shTped.Bin AND
+        Ordp.SupplierCD = shTped.SourceFlag
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_ProductionPlanSched] shTd WITH (NOLOCK)
+        ON
+        Ordp.OLBranch = shTd.BranchCD AND
+        Ordp.LineCD = shTd.LineCD AND
+        Ordp.FQBin = shTd.Bin AND
+        DATEPART(WEEKDAY,Ordp.DeliveryDate) = shTd.WeekDay AND
+        Ordp.SupplierCD = shTd.SourceFlag
+        LEFT JOIN
+        [dbOrder].[dbo].[shT_ProductionPlanSched] shTed WITH (NOLOCK)
+        ON
+        shTed.BranchCD = 999 AND
+        Ordp.LineCD = shTed.LineCD AND
+        Ordp.FQBin = shTed.Bin AND
+        DATEPART(WEEKDAY,Ordp.DeliveryDate) = shTed.WeekDay AND
+        Ordp.SupplierCD = shTed.SourceFlag
+        where
+        (dateadd(day,-1*ISNULL(ISNULL(ISNULL(shTpd.LockDays,shTped.LockDays),shTd.BasicLockDays),shTed.BasicLockDays),Ordp.DeliveryDate) &lt; @start_day)
+        or
+        ((dateadd(day,-1*ISNULL(ISNULL(ISNULL(shTpd.LockDays,shTped.LockDays),shTd.BasicLockDays),shTed.BasicLockDays),Ordp.DeliveryDate) = @start_day AND
+        CONVERT(datetime,CONVERT(varchar,ISNULL(ISNULL(ISNULL(shTpd.SpecialLockTime,shTped.SpecialLockTime),shTd.BasicLockTime),shTed.BasicLockTime))) &lt; CONVERT(varchar,@now,8)))
+
+        UPDATE
+        Ordp
+        SET
+        Ordp.OrderQty = 0
+        FROM
+        #OrderQty_temp_定数 Ordp
+        INNER JOIN
+        [dbOrder].[dbo].[shT_PcOrderList] shTt WITH (NOLOCK)
+        ON
+        Ordp.OLBranch = shTt.BranchCD
+        AND Ordp.OLJAN = shTt.JAN
+        AND Ordp.FQBin = shTt.Bin
+        AND Ordp.SupplierCD = shTt.PcCode
+        WHERE shTt.EndDate IS NOT NULL
+        AND Ordp.DeliveryDate &gt;= shTt.EndDate
+        AND shTt.EndDate &gt;= DATEADD(DD,-7,@now)
+
+
+        -- 定数より普通と重複分を削除
+        DELETE 定数
+        FROM
+        #OrderQty_temp_定数 定数
+        INNER JOIN
+        #OrderQty_temp_普通 普通
+        ON
+        定数.OLJAN = 普通.OLJAN
+        AND 定数.OLBranch = 普通.OLBranch
+        AND 定数.FQBin = 普通.OQBin
+        AND 定数.DeliveryDate = 普通.DeliveryDate
+
+
+        -- ３つの発注データを統合する。
+        SELECT *
+        INTO #OrderQty_Temp
+        FROM #OrderQty_temp_普通
+        UNION ALL
+        SELECT * FROM #OrderQty_temp_客注
+        UNION ALL
+        SELECT
+        OLJAN,
+        ProdName,
+        OLBranch,
+        LineCD,
+        SupplierCD,
+        LogicFlg,
+        OQJAN,
+        OQBranch,
+        DeliveryDate,
+        OQBin,
+        UserCD,
+        OrderQty,
+        FQJAN,
+        FQBranch,
+        FQBin,
+        MonFixQty,
+        TueFixQty,
+        WedFixQty,
+        ThuFixQty,
+        FriFixQty,
+        SatFixQty,
+        SunFixQty,
+        DeliveryStartOne,
+        DeliveryEndOne,
+        DeliveryStartTwo,
+        DeliveryEndTwo,
+        DeliveryStartThree,
+        DeliveryEndThree
+        FROM #OrderQty_temp_定数
+        WHERE OrderQty is not null
+
+        -- 発注データより九州外注除外分を削除
+        DELETE OQT
+        FROM #OrderQty_Temp OQT
+        INNER JOIN #view OP
+        ON OQT.OLJAN = OP.商品CD
+        AND OQT.OLBranch = OP.店CD
+
+
+
+        -- 納品開始日と納品終了日の追加
+        UPDATE #OrderQty_Temp
+        SET OrderQty = 0
+        WHERE DeliveryDate &gt; ISNULL(DeliveryEndThree,'2999/12/31')
+
+
+
+        -- 納品開始日と納品終了日の追加
+        UPDATE #OrderQty_Temp
+        SET OrderQty = 0
+        WHERE
+        DeliveryDate &gt; ISNULL(DeliveryEndTwo,'2999/12/31')
+        AND DeliveryDate &lt; ISNULL(DeliveryStartThree,'2999/12/31')
+
+
+        -- 納品開始日と納品終了日の追加
+        UPDATE #OrderQty_Temp
+        SET OrderQty = 0
+        WHERE
+        DeliveryDate &gt; ISNULL(DeliveryEndOne,'2999/12/31')
+        AND DeliveryDate &lt; ISNULL(DeliveryStartTwo,'2999/12/31')
+
+
+
+        -- 納品開始日と納品終了日の追加
+        UPDATE #OrderQty_Temp
+        SET OrderQty = 0
+        WHERE DeliveryDate &lt; ISNULL(DeliveryStartOne,'1900/01/01')
+
+
+        -- 閉店処理を行って検索対象のテーブルとする。
+        SELECT
+        DeliveryDate,
+        isnull(OQBin,FQBin) AS Bin,
+        OLBranch AS BranchCD,
+        OLJAN AS ProductCD,
+        LineCD,
+        OrderQty,
+        SupplierCD,
+        UserCD
+        INTO #search_table
+        FROM
+        #OrderQty_Temp OQ
+        INNER JOIN
+        [dbOrder].[dbo].[shM_Branch] B WITH (NOLOCK)
+        ON
+        OQ.OLBranch = B.BranchCD
+
+        -- 返却データの整形
+
+        SELECT
+        #{bo.centerId} AS supplierCD,
+        SE.BranchCD,
+        SE.Bin AS mailNo,
+        SE.ProductCD AS jan,
+        CAST(SE.OrderQty as DECIMAL(10,0)) AS orderQty,
+        CONVERT(VARCHAR(12),SE.DeliveryDate,111) AS deliveryDate,
+        SE.UserCD as userCd
+        FROM
+        #search_table AS SE
+        LEFT JOIN
+        [dbOrder].[dbo].[shM_SupplierPC] AS SP WITH (NOLOCK)
+        ON
+        SE.SupplierCD = SP.SupplierCD
+        LEFT JOIN
+        [MasterDB].[dbo].[lines] AS LI WITH (NOLOCK)
+        ON
+        SE.LineCD = LI.LineCD
+        LEFT JOIN
+        [MasterDB].[dbo].[PurchaseGroupBranches] AS ST WITH (NOLOCK)
+        ON
+        SE.BranchCD = ST.BranchCD
+        LEFT JOIN #product_store PDS
+        ON PDS.商品CD = SE.ProductCD
+        AND PDS.地域CD = ST.PurchaseGroupCD
+        AND PDS.店CD = SE.BranchCD
+        LEFT JOIN #product_area PDA
+        ON PDA.商品CD = SE.ProductCD
+        AND PDA.地域CD = ST.PurchaseGroupCD
+        AND PDA.店CD = 0
+        WHERE
+        SE.OrderQty &gt; 0 AND
+        SE.OrderQty IS NOT NULL
+        <if test="bo.jan != null and '' != bo.jan">
+            AND SE.ProductCD = #{bo.jan}
+        </if>
+        <if test="bo.callCd != null">
+            AND ISNULL(PDS.呼出品番,PDA.呼出品番) = #{bo.callCd}
+        </if>
+        <if test="bo.productName != null and '' != bo.productName">
+            AND (ISNULL(PDS.商品名,PDA.商品名) like '%${bo.productName}%' or ISNULL(PDS.商品名,PDA.商品名) like '%${bo.productName}%')
+        </if>
+        ORDER BY SP.SupplierCD, SP.SupplierName, SE.ProductCD, SE.DeliveryDate
+
+        drop table #DeliveryDates;
+        drop table #product;
+        drop table #product_area;
+        drop table #product_store;
+        drop table #product_distinct;
+        drop table #view;
+        drop table #mt_mailcontrol;
+        drop table #OrderQty_temp_普通;
+        drop table #OrderQty_temp_客注;
+        drop table #OrderQty_temp_定数;
+        drop table #OrderQty_Temp;
+        drop table #temp;
+        drop table #search_table;
+    </select>
+</mapper>

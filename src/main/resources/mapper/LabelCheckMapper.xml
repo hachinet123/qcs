@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.LabelCheckMapper">
+
+    <select id="queryList" resultType="Map">
+        select *
+        from (
+                 select main.center_id,
+                        item.line_id,
+                        line.linename                             as line_name,
+                        coalesce(item.call_code, item0.call_code) as final_call_code,
+                        coalesce(item.item_name, item0.item_name) as final_item_name,
+                        coalesce(item.exptime, item0.exptime)     as final_exp_time,
+                        <foreach collection="param.mailNoList" index="index" item="mailNo">
+                            sum(case when mail_no = #{mailNo} then qy end) as mail_no${mailNo},
+                        </foreach>
+                        main.item_id,
+                        taste_qy,
+                        main.schedule_date,
+                        sum(qy)                                   as sum_qy
+              from (select p.center_id,
+                           p.mail_no,
+                           p.item_id,
+                           p.qy,
+                           p.store_id,
+                           case #{param.dateType}
+                                when 0 then m.product_date
+                                when 1 then p.dlvsched_date
+                           end as schedule_date
+                    from (select dlvsched_date,
+                                 center_id,
+                                 mail_no,
+                                 item_id,
+                                 qy,
+                                 store_id
+                          from centralkitchen.tr_produceplan
+                          where center_id = #{param.centerId}
+                            <if test="param.dateType == 1">
+                                and dlvsched_date between #{param.deliveryStartDate} and #{param.deliveryEndDate}
+                            </if>
+                            <if test="param.jan != null and param.jan.length > 0">
+                                and item_id in
+                                <foreach collection="param.jan" item="janStr" index="index" open="(" separator="," close=")">
+                                    #{janStr}
+                                </foreach>
+                            </if>
+                         ) p
+                             inner join (
+                        select center_id,
+                               mail_no,
+                               dlvsched_date - leadtime as product_date,
+                               leadtime,
+                               dlvsched_date
+                        from centralkitchen.mt_mailcontrol
+                        where f_del = 0
+                    ) m on p.center_id = m.center_id
+                        and p.mail_no = m.mail_no
+                        and p.dlvsched_date = m.dlvsched_date
+                    where 1 = 1
+                        <if test="param.dateType == 0">
+                            and m.product_date between #{param.deliveryStartDate} and #{param.deliveryEndDate}
+                        </if>
+                   ) main
+                          left join centralkitchen.purchasegroupbranches pubr
+                                    on main.store_id = pubr.branchcd
+                          left join (select item_id,
+                                            item_name,
+                                            store_id,
+                                            area_id,
+                                            line_id,
+                                            call_code,
+                                            exptime
+                                    from centralkitchen.tm_shohin
+                                    where f_active != 9) item
+                                    on main.item_id = item.item_id
+                                        and main.store_id = item.store_id
+                                        and pubr.purchasegroupcd = item.area_id
+                          left join (select item_id,
+                                            item_name,
+                                            store_id,
+                                            area_id,
+                                            line_id,
+                                            call_code,
+                                            exptime
+                                    from centralkitchen.tm_shohin
+                                    where store_id = 0
+                                         and f_active != 9) item0
+                                    on main.item_id = item0.item_id
+                                         and pubr.purchasegroupcd = item0.area_id
+                          left join centralkitchen.lines line
+                                    on item.line_id = line.linecd
+                          left join centralkitchen.mt_itemcenter_product prd
+                                    on main.center_id = prd.center_id
+                                        and main.item_id = prd.item_id
+                 group by item.line_id,
+                          line.linename,
+                          final_call_code,
+                          final_item_name,
+                          final_exp_time,
+                          main.center_id,
+                          main.item_id,
+                          taste_qy,
+                          main.schedule_date
+             ) a
+        where 1 = 1
+            <if test="param.lineId != null and param.lineId.length > 0">
+                and a.line_id in
+                <foreach collection="param.lineId" item="id" index="index" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </if>
+            <if test="param.callCode != null and param.callCode.length != 0">
+                and a.final_call_code in
+                <foreach collection="param.callCode" item="callCode" index="index" open="(" separator="," close=")">
+                    #{callCode}
+                </foreach>
+            </if>
+            <if test="param.itemName != null and param.itemName.length != 0">
+                and (
+                <foreach collection="param.itemName" item="item" index="index" separator="or">
+                    a.final_item_name like CONCAT ('%',#{item},'%')
+                </foreach>
+                )
+            </if>
+        order by a.line_id, a.final_call_code
+    </select>
+</mapper>

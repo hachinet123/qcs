@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.MtDocumentLinkMapper">
+
+    <select id="downloadCSV" resultType="com.tre.centralkitchen.domain.vo.system.WkRecievelcuProducedEscVo">
+        SELECT wkrp.esc_date,
+               wkrp.center_id,
+               wkrp.column01,
+               wkrp.column02,
+               wkrp.column03,
+               wkrp.column04,
+               wkrp.column05,
+               wkrp.column06,
+               wkrp.column07,
+               wkrp.column08,
+               wkrp.column09,
+               wkrp.column10,
+               wkrp.column11,
+               wkrp.column12,
+               wkrp.column13,
+               wkrp.column14,
+               wkrp.column15,
+               wkrp.column16,
+               wkrp.column17,
+               wkrp.column18,
+               wkrp.column19,
+               wkrp.column20,
+               wkrp.column21,
+               wkrp.column22,
+               wkrp.column23,
+               wkrp.column24,
+               wkrp.column25,
+               wkrp.column26,
+               wkrp.column27,
+               wkrp.column28,
+               wkrp.column29,
+               wkrp.column30,
+               wkrp.column31,
+               wkrp.column32,
+               wkrp.column33,
+               wkrp.column34,
+               wkrp.column35,
+               wkrp.column36,
+               wkrp.column37,
+               wkrp.column38,
+               wkrp.column39,
+               wkrp.column40,
+               wkrp.column41,
+               wkrp.column42,
+               wkrp.column43,
+               wkrp.column44,
+               wkrp.column45,
+               wkrp.column46,
+               wkrp.column47,
+               wkrp.f_del,
+               wkrp.ins_date,
+               wkrp.ins_time,
+               wkrp.ins_user_id,
+               wkrp.ins_func_id,
+               wkrp.ins_ope_id,
+               wkrp.upd_date,
+               wkrp.upd_time,
+               wkrp.upd_user_id,
+               wkrp.upd_func_id,
+               wkrp.upd_ope_id,
+               ts.item_id   AS itemId,
+               ts.item_name AS itemName,
+               mts.shortname AS storeName,
+               mp.name AS placeName
+        FROM escape.wk_recievelcu_produced_esc wkrp
+        INNER JOIN centralkitchen.purchasegroupbranches css
+            ON wkrp.center_id::int=css.branchcd
+            AND css.branchcd=#{bo.centerId}::int
+        LEFT JOIN centralkitchen.tm_shohin ts
+            ON css.purchasegroupcd = ts.area_id
+            AND ts.store_id = 0
+            AND ts.call_code = wkrp.column03::int
+        LEFT JOIN (select distinct store_id,shortname from centralkitchen.mt_centerdlvstore where center_id=#{bo.centerId}::int) mts
+            ON mts.store_id=wkrp.column05
+        LEFT JOIN centralkitchen.mt_place mp ON wkrp.column47::int = mp.id
+        WHERE wkrp.center_id = #{bo.centerId}::int
+          AND wkrp.esc_date BETWEEN #{bo.stDate}::date
+          AND #{bo.edDate}::date
+          AND wkrp.f_del = 0
+    </select>
+</mapper>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.MtMailItemHistoryMapper">
+
+    <insert id="insertFmtHistory">
+        <if test="list != null and !list.isEmpty()">
+            <foreach collection="list" index="index" item="param" separator=";">
+                insert into
+                history.mt_mailitem_history(backup_date,center_id,item_id,store_id,
+                mail_no,memo,f_del,ins_date,
+                ins_time,ins_user_id,ins_func_id,ins_ope_id,
+                upd_date,upd_time,upd_user_id,upd_func_id,upd_ope_id,update_typeid)values (#{backupDate},
+                #{centerId}::integer,#{param.itemId},#{param.storeId}::int,#{param.mailNo}::smallint,#{param.memo},0,current_date,current_time
+                ,#{userId}::integer,#{insFuncId},#{insOpeId},current_date,current_time,#{userId}::integer,#{insFuncId},#{insOpeId},1
+                )
+            </foreach>
+        </if>
+    </insert>
+    <insert id="recordImportHistory">
+        <if test="list != null and !list.isEmpty()">
+            <foreach collection="list" index="index" item="param" separator=";">
+                insert into
+                history.mt_mailitem_history(backup_date,center_id,item_id,store_id,
+                mail_no,memo,f_del,ins_date,
+                ins_time,ins_user_id,ins_func_id,ins_ope_id,
+                upd_date,upd_time,upd_user_id,upd_func_id,upd_ope_id,update_typeid)values (#{backupDate},
+                #{param.centerId}::integer,#{param.itemId},#{param.storeId}::int,#{param.mailNo}::smallint,#{param.memo},0,current_date,current_time
+                ,#{userId}::integer,#{insFuncId},#{insOpeId},current_date,current_time,#{userId}::integer,#{insFuncId},#{insOpeId},1
+                )
+            </foreach>
+        </if>
+    </insert>
+</mapper>

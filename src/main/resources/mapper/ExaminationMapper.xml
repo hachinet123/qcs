@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.ExaminationMapper">
+
+    <select id="queryPage" resultType="com.tre.centralkitchen.domain.vo.system.MtItemCenterProductVo">
+        SELECT DISTINCT
+        tob.center_id,
+        c.branchname AS centerName,
+        ts1.call_code AS callCode,
+        tob.item_id,
+        ts1.item_name AS itemName,
+        ts1.line_id as lineId,
+        l.linename AS lineName,
+        useLine.seq
+        FROM
+        centralkitchen.mt_itemcenter_product tob
+        INNER JOIN centralkitchen.purchasegroupbranches css
+        ON tob.center_id=css.branchcd
+        AND css.branchcd=#{param.centerId}
+        INNER JOIN centralkitchen.tm_shohin ts1
+        ON tob.item_id = ts1.item_id
+        AND css.purchasegroupcd=ts1.area_id
+        AND ts1.store_id = 0
+        AND ts1.pctgt_typeid = 1
+        LEFT JOIN centralkitchen.branches c ON tob.center_id = c.branchcd
+        INNER JOIN centralkitchen.mt_useline useLine
+        ON ts1.line_id = useLine.line_id
+        LEFT JOIN centralkitchen.lines l ON ts1.line_id = l.linecd
+
+        <where>
+            tob.center_id = #{param.centerId}
+            <if test="param.lineIdList!=null and param.lineIdList.size>0">
+                and ts1.line_id in
+                <foreach collection="param.lineIdList" item="item" index="index" separator="," open="(" close=")">
+                    #{item}::int
+                </foreach>
+            </if>
+            <if test="param.itemIdList!=null and param.itemIdList.size>0">
+                and tob.item_id in
+                <foreach collection="param.itemIdList" item="item" index="index" separator="," open="(" close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="param.callCode != null">
+                and ts1.call_code =#{param.callCode}
+            </if>
+            <if test="param.itemNameList!=null and param.itemNameList.size>0">
+                and (
+                <foreach collection="param.itemNameList" item="item" index="index" separator="or">
+                    ts1.item_name like CONCAT ('%',#{item},'%') or ts1.item_name_k like CONCAT ('%',#{item},'%')
+                </foreach>
+                )
+            </if>
+            and tob.f_del = 0 and ts1.f_active &lt;&gt; 9 and tob.taste_qy = 0
+        </where>
+        order by useLine.seq,ts1.line_id,tob.item_id,ts1.call_code
+    </select>
+</mapper>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.MtItemCenterMaterialMapper">
+
+    <select id="search" resultType="com.tre.centralkitchen.domain.vo.system.ItemCenterMaterialVo">
+        select mtmaterial.center_id as centerId, branche.branchname as centerName , mtmaterial.item_id,
+        tshohin.item_name as itemName,  mtmaterial.safetystock_qy as safetystockQy
+        from centralkitchen.mt_itemcenter_material mtmaterial
+        inner JOIN centralkitchen.purchasegroupbranches pubr ON mtmaterial.center_id = pubr.branchcd
+        inner join centralkitchen.branches branche on branche.branchcd = mtmaterial.center_id
+        inner join (select area_id ,item_id , item_name, fritem_typeid, line_id  from centralkitchen.tm_shohin  where  store_id = 0 and f_active != 9 )
+        AS tshohin
+        on pubr.purchasegroupcd = tshohin.area_id
+        and mtmaterial.item_id = tshohin.item_id
+        <where>
+            <if test="bo.centerId != null ">
+                mtmaterial.center_id = #{bo.centerId}
+            </if>
+            <if test="bo.itemIds != null and bo.itemIds.size() >0 ">
+                and
+                <foreach collection="bo.itemIds" item="itemId" index="index" separator="or">
+                    mtmaterial.item_id = #{itemId}
+                </foreach>
+
+            </if>
+            <if test="bo.lineIds != null and bo.lineIds.size() >0  ">
+                and tshohin.line_id in
+                <foreach collection="bo.lineIds" item="lineId" index="index" separator="," open="(" close=")">
+                    #{lineId}
+                </foreach>
+            </if>
+            <if test="bo.itemNames != null and bo.itemNames.size() >0 ">
+                and
+                <foreach collection="bo.itemNames" item="itemName" index="index" separator="or" >
+                    tshohin.item_name like concat('%',#{itemName},'%')
+                </foreach>
+            </if>
+            and tshohin.fritem_typeid in (4,8) and mtmaterial.f_del = 0
+        </where>
+
+    </select>
+    <select id="queryItemCanterMaterialOne" resultType="com.tre.centralkitchen.domain.vo.system.ItemCenterMaterSearchVo"
+            parameterType="com.tre.centralkitchen.domain.bo.system.MtItemCenterMaterialBo">
+        select distinct mtmaterial.center_id,
+        mtmaterial.item_id, tshohin.item_name as itemName, mtmaterial.safetystock_qy,
+        mtmaterial.f_del ,mtmaterial.ins_date , mtmaterial.ins_time , mtmaterial.ins_user_id , mtmaterial.ins_func_id ,
+        mtmaterial.ins_ope_id , mtmaterial.upd_date , mtmaterial.upd_time ,
+        mtmaterial.upd_user_id , mtmaterial.upd_func_id, mtmaterial.upd_ope_id
+        from centralkitchen.mt_itemcenter_material mtmaterial
+        inner join centralkitchen.tm_shohin tshohin on tshohin.item_id = mtmaterial.item_id
+        <where>
+            <if test="bo.centerId != null">
+                mtmaterial.center_id =#{bo.centerId}
+            </if>
+            <if test="bo.itemId != null ">
+                and mtmaterial.item_id = #{bo.itemId}
+            </if>
+
+            and tshohin.store_id=0 and mtmaterial.f_del = 0
+        </where>
+    </select>
+
+</mapper>

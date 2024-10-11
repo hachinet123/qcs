@@ -1,0 +1,654 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.DistributionInstructionMapper">
+    <select id="selectDistributionInstructionProdt"
+            resultType="com.tre.centralkitchen.domain.vo.system.DistributionInstructionPoVo">
+        WITH
+        tmpSchedTable AS (
+        select dlvsched_date,
+        #{param.stDate}::date + leadtime as s_dlvsched_date,
+        #{param.edDate}::date + leadtime as e_dlvsched_date,
+        mail_no,
+        center_id,
+        leadtime
+        from centralkitchen.mt_mailcontrol
+        where center_id = #{param.centerId}
+        <if test="param.mailIdList != null and !param.mailIdList.isEmpty()">
+            and mail_no in
+            <foreach collection="param.mailIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        and f_del = 0
+        ),
+        tmpplan AS (
+        SELECT
+        main.dlvsched_date - tmpdate.leadtime as dlvsched_date,
+        main.center_id,
+        main.mail_no,
+        main.item_id,
+        main.store_id,
+        main.qy
+        FROM centralkitchen.tr_produceplan main
+        INNER JOIN tmpSchedTable tmpdate
+        ON main.center_id = tmpdate.center_id
+        AND main.mail_no = tmpdate.mail_no
+        AND main.dlvsched_date <![CDATA[ >= ]]> tmpdate.s_dlvsched_date
+        AND main.dlvsched_date <![CDATA[ <= ]]> tmpdate.e_dlvsched_date
+        LEFT JOIN centralkitchen.purchasegroupbranches pubr ON main.store_id = pubr.branchcd
+
+        left join centralkitchen.tm_shohin item
+        on main.item_id = item.item_id
+        and main.store_id = item.store_id
+        and pubr.purchasegroupcd = item.area_id
+        AND item.f_active != 9
+
+        LEFT JOIN centralkitchen.tm_shohin item0 ON main.item_id = item0.item_id
+        AND item0.store_id = 0
+        AND pubr.purchasegroupcd = item0.area_id
+        AND item0.f_active != 9
+        LEFT JOIN centralkitchen.mt_productwkgrp grop
+        ON main.center_id = grop.center_id
+        AND item0.wkgrp_id = grop.ID
+        AND item0.line_id = grop.line_id
+        WHERE
+        main.center_id = #{param.centerId}
+        <if test="param.mailIdList != null and !param.mailIdList.isEmpty()">
+            AND main.mail_no in
+            <foreach collection="param.mailIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.lineIdList != null and !param.lineIdList.isEmpty()">
+            AND item0.line_id in
+            <foreach collection="param.lineIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.workgroupIdList != null and !param.workgroupIdList.isEmpty()">
+            and (item0.wkgrp_id in
+            <foreach collection="param.workgroupIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach> OR item.wkgrp_id in
+            <foreach collection="param.workgroupIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>)
+        </if>
+        AND main.f_del = 0
+        )
+        , tmpresult AS (
+        SELECT
+        mc.center_id, mc.mail_no, mc.store_id, main.item_id, main.dlvsched_date
+        FROM
+        (
+        SELECT DISTINCT center_id, mail_no, item_id, dlvsched_date FROM tmpplan ) main
+        CROSS JOIN ( SELECT center_id, mail_no, store_id FROM centralkitchen.mt_mailstore WHERE
+        center_id=#{param.centerId}
+        <if test="param.mailIdList != null and !param.mailIdList.isEmpty()">
+            AND mail_no in
+            <foreach collection="param.mailIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        AND f_del = 0 ) mc
+        WHERE
+        main.center_id = mc.center_id
+        AND main.mail_no = mc.mail_no
+        )
+        ,
+        tmpfinal AS MATERIALIZED(
+        SELECT
+        res.center_id, COALESCE(item.wkgrp_id,item0.wkgrp_id) as wkgrp_id, item0.line_id, concat_ws ( '-', to_char( res.dlvsched_date, 'yyyyMMdd' ),
+        res.mail_no, res.item_id, res.store_id ) AS ID, stor.isClosed, cetr.branchname AS centerName, to_char(
+        res.dlvsched_date, 'yyyy/MM/dd' ) AS scheduleDate, res.mail_no || '便' AS mailNo, res.mail_no AS mailId,
+        line.linename AS lineName, COALESCE ( item.call_code, item0.call_code ) AS callCode, res.item_id AS itemId, LEFT
+        ( COALESCE ( item.item_name, item0.item_name ), 13 ) AS itemName, COALESCE ( item.n_szname, item0.n_szname ) ||
+        unit.unitname AS itemSpecs, res.store_id, dlvstore.shortname AS storeName, dlvstore.shortname AS storeNameShort,
+        COALESCE ( plan.qy, '0' ) AS qty
+        FROM
+        tmpresult res
+        LEFT JOIN tmpplan plan
+        ON res.dlvsched_date = plan.dlvsched_date
+        AND res.center_id = plan.center_id
+        AND res.mail_no = plan.mail_no
+        AND res.item_id = plan.item_id
+        AND res.store_id = plan.store_id
+        LEFT JOIN centralkitchen.purchasegroupbranches pubr ON res.store_id = pubr.branchcd
+        LEFT JOIN
+        centralkitchen.tm_shohin item
+        ON res.item_id = item.item_id
+        AND res.store_id = item.store_id
+        AND pubr.purchasegroupcd = item.area_id
+        AND item.f_active != 9
+        LEFT JOIN centralkitchen.tm_shohin item0 ON res.item_id = item0.item_id
+        AND item0.store_id = 0
+        AND pubr.purchasegroupcd = item0.area_id
+        AND item0.f_active != 9
+        LEFT JOIN centralkitchen.lines line ON item0.line_id = line.linecd
+        LEFT JOIN centralkitchen.mt_unit unit ON item0.n_szname_typeid = unit.unitcd
+        LEFT JOIN centralkitchen.mt_lotgroup logp ON item0.lotgrp_id = logp.ID
+        LEFT JOIN centralkitchen.branches stor ON res.store_id = stor.branchcd
+        LEFT JOIN centralkitchen.branches cetr ON res.center_id = cetr.branchcd
+        LEFT JOIN  (SELECT DISTINCT store_id,shortname,line_id FROM centralkitchen.mt_centerdlvstore WHERE center_id=#{param.centerId}) dlvstore
+        ON res.store_id = dlvstore.store_id
+        AND dlvstore.line_id = item0.line_id
+        )
+
+        select
+        fin.ID,
+        fin.isClosed,
+        fin.centerName,
+        fin.scheduleDate,
+        fin.mailNo,
+        fin.mailId,
+        fin.lineName,
+        SUBSTRING(grop.NAME, 1, 10) AS workGroupName,
+        fin.callCode,
+        fin.itemId,
+        fin.itemName,
+        fin.itemSpecs,
+        fin.store_id,
+        fin.storeName,
+        fin.storeNameShort,
+        fin.qty
+
+        from tmpfinal fin
+        INNER JOIN centralkitchen.mt_productwkgrp grop
+        ON fin.center_id = grop.center_id
+        AND fin.wkgrp_id = grop.ID
+        AND fin.line_id = grop.line_id
+        INNER JOIN centralkitchen.mt_useline useLine
+        ON fin.line_id = useLine.line_id
+
+        <where>
+            <if test="param.isExceptZero != null and param.isExceptZero == 1">
+                COALESCE (fin.qty, 0) != 0
+            </if>
+        </where>
+
+        ORDER BY
+        fin.scheduleDate,
+        fin.mailId,
+        useLine.seq,
+        fin.line_id,
+        grop.seq,
+        fin.wkgrp_id,
+        fin.callCode,
+        fin.store_id
+    </select>
+    <select id="selectDistributionInstructionProdtPdf"
+            resultType="com.tre.centralkitchen.domain.vo.system.DistributionInstructionPoVo">
+        with tmpSchedTable as (
+        select dlvsched_date,
+        #{param.stDate}::date + leadtime as s_dlvsched_date,
+        #{param.edDate}::date + leadtime as e_dlvsched_date,
+        mail_no,
+        center_id,
+        leadtime
+        from centralkitchen.mt_mailcontrol
+        where center_id = #{param.centerId}
+        <if test="param.mailIdList != null and !param.mailIdList.isEmpty()">
+            and mail_no in
+            <foreach collection="param.mailIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        and f_del = 0
+        ), tmpTable as (
+        select concat_ws('-',
+        to_char(main.dlvsched_date - tmpdate.leadtime, 'yyyyMMdd'),
+        main.mail_no,
+        line.linecd,
+        grop.id) as id,
+        stor.isclosed as isClosed,
+        main.center_id as centerId,
+        cetr.branchname as centerName,
+        main.dlvsched_date - tmpdate.leadtime as scheduleDate,
+        main.mail_no as mailId,
+        main.mail_no || '便' as mailNo,
+        line.linecd as lineId,
+        line.linename as lineName,
+        grop.seq as wkSeq,
+        grop.id as workGroupId,
+        SUBSTRING (grop.name,1,10) as workGroupName,
+        coalesce(item.call_code, item0.call_code) as callCode,
+        main.item_id as itemId,
+        coalesce(item.item_name, item0.item_name) as itemName,
+        coalesce(item.n_szname, item0.n_szname) || unit.unitname as itemSpecs,
+        main.store_id as storeId,
+        dlvstore.shortname as storeName,
+        dlvstore.shortname as storeNameShort,
+        coalesce(main.qy, '0') as qty
+        from centralkitchen.tr_produceplan main
+        inner join tmpSchedTable tmpdate
+        on main.center_id = tmpdate.center_id
+        and main.mail_no = tmpdate.mail_no
+        and main.dlvsched_date <![CDATA[ >= ]]> tmpdate.s_dlvsched_date
+        and main.dlvsched_date <![CDATA[ <= ]]> tmpdate.e_dlvsched_date
+        left join centralkitchen.purchasegroupbranches pubr
+        on main.store_id = pubr.branchcd
+        left join centralkitchen.tm_shohin item
+        on main.item_id = item.item_id
+        and main.store_id = item.store_id
+        and pubr.purchasegroupcd = item.area_id
+        and item.f_active != 9
+        left join centralkitchen.tm_shohin item0
+        on main.item_id = item0.item_id
+        and item0.store_id = 0
+        and pubr.purchasegroupcd = item0.area_id
+        and item0.f_active != 9
+        left join centralkitchen.mt_productwkgrp grop
+        on main.center_id = grop.center_id
+        and coalesce(item.wkgrp_id,item0.wkgrp_id) = grop.id
+        and item0.line_id = grop.line_id
+        left join centralkitchen.lines line
+        on item0.line_id = line.linecd
+        left join centralkitchen.mt_unit unit
+        on item0.n_szname_typeid = unit.unitcd
+        left join centralkitchen.mt_lotgroup logp
+        on item0.lotgrp_id = logp.id
+        left join centralkitchen.branches cetr
+        on main.center_id = cetr.branchcd
+        left join centralkitchen.branches stor
+        on main.store_id = stor.branchcd
+        LEFT JOIN  (SELECT DISTINCT store_id,shortname,line_id FROM centralkitchen.mt_centerdlvstore WHERE center_id=#{param.centerId}) dlvstore
+        ON main.store_id = dlvstore.store_id
+        AND dlvstore.line_id = item0.line_id
+        where main.center_id = #{param.centerId}
+        <if test="param.isExceptZero != null and param.isExceptZero == 1">
+            and main.qy != 0
+        </if>
+        <if test="param.lineIdList != null and !param.lineIdList.isEmpty()">
+            and item0.line_id in
+            <foreach collection="param.lineIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.mailIdList != null and !param.mailIdList.isEmpty()">
+            and main.mail_no in
+            <foreach collection="param.mailIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.workgroupIdList != null and !param.workgroupIdList.isEmpty()">
+            and (item0.wkgrp_id in
+            <foreach collection="param.workgroupIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach> OR item.wkgrp_id in
+            <foreach collection="param.workgroupIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>)
+        </if>
+        and main.f_del= 0
+        )
+        select concat_ws('-', id, callCode, itemId) as id,
+        isClosed as isClosed,
+        centerName as centerName,
+        to_char(scheduleDate, 'yyyy/MM/dd') as scheduleDate,
+        mailNo as mailNo,
+        mailId as mailId,
+        lineId as lineId,
+        lineName as lineName,
+        workGroupId as workGroupId,
+        workGroupName as workGroupName,
+        callCode as callCode,
+        itemId as itemId,
+        left(itemName, 13) as itemName,
+        itemSpecs as itemSpecs,
+        storeId as storeId,
+        storeName as storeName,
+        storeNameShort as storeNameShort,
+        sum(qty) as qty
+        from tmpTable
+        INNER JOIN centralkitchen.mt_useline useLine
+        ON tmpTable.lineId = useLine.line_id
+        <if test="param.isClosed != null and param.isClosed == 1">
+            where isClosed != 1
+        </if>
+        group by id,
+        isClosed,
+        centerName,
+        scheduleDate,
+        mailNo,
+        mailId,
+        itemId,
+        useLine.seq,
+        lineId,
+        lineName,
+        wkSeq,
+        workGroupId,
+        workGroupName,
+        callCode,
+        itemName,
+        itemSpecs,
+        storeId,
+        storeName,
+        storeNameShort
+        ORDER BY
+        scheduleDate,
+        mailNo,
+        useLine.seq,
+        lineId,
+        wkSeq,
+        workGroupId,
+        callCode,
+        storeId
+    </select>
+    <select id="selectDistributionInstructionSched"
+            resultType="com.tre.centralkitchen.domain.vo.system.DistributionInstructionPoVo">
+        WITH tmpplan AS (
+        SELECT main.dlvsched_date,
+        main.center_id,
+        main.mail_no,
+        main.item_id,
+        main.store_id,
+        main.qy
+        FROM centralkitchen.tr_produceplan main
+        LEFT JOIN centralkitchen.purchasegroupbranches pubr ON main.store_id = pubr.branchcd
+
+        left join centralkitchen.tm_shohin item
+        on main.item_id = item.item_id
+        and main.store_id = item.store_id
+        and pubr.purchasegroupcd = item.area_id
+        AND item.f_active != 9
+
+        LEFT JOIN centralkitchen.tm_shohin item0 ON main.item_id = item0.item_id
+        AND item0.store_id = 0
+        AND pubr.purchasegroupcd = item0.area_id
+        AND item0.f_active != 9
+        LEFT JOIN centralkitchen.mt_productwkgrp grop
+        ON main.center_id = grop.center_id
+        AND item0.wkgrp_id = grop.ID
+        AND item0.line_id = grop.line_id
+        WHERE
+        main.center_id = #{param.centerId}
+        AND main.dlvsched_date &gt;= #{param.stDate} :: DATE
+        AND main.dlvsched_date &lt;= #{param.edDate} :: DATE
+        <if test="param.mailIdList != null and !param.mailIdList.isEmpty()">
+            AND main.mail_no in
+            <foreach collection="param.mailIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.lineIdList != null and !param.lineIdList.isEmpty()">
+            AND item0.line_id in
+            <foreach collection="param.lineIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.workgroupIdList != null and !param.workgroupIdList.isEmpty()">
+            and (item0.wkgrp_id in
+            <foreach collection="param.workgroupIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach> OR item.wkgrp_id in
+            <foreach collection="param.workgroupIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>)
+        </if>
+        AND main.f_del = 0
+        )
+        , tmpresult AS (
+        SELECT
+        mc.center_id, mc.mail_no, mc.store_id, main.item_id, main.dlvsched_date
+        FROM
+        (
+        SELECT DISTINCT center_id, mail_no, item_id, dlvsched_date FROM tmpplan ) main
+        CROSS JOIN ( SELECT center_id, mail_no, store_id FROM centralkitchen.mt_mailstore WHERE
+        center_id=#{param.centerId}
+        <if test="param.mailIdList != null and !param.mailIdList.isEmpty()">
+            AND mail_no in
+            <foreach collection="param.mailIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        AND f_del = 0 ) mc
+        WHERE
+        main.center_id = mc.center_id
+        AND main.mail_no = mc.mail_no
+        )
+        , tmpfinal AS MATERIALIZED(
+        SELECT
+        res.center_id, COALESCE(item.wkgrp_id,item0.wkgrp_id) as wkgrp_id, item0.line_id, concat_ws ( '-', to_char( res.dlvsched_date, 'yyyyMMdd' ),
+        res.mail_no, res.item_id, res.store_id ) AS ID, stor.isClosed, cetr.branchname AS centerName, to_char(
+        res.dlvsched_date, 'yyyy/MM/dd' ) AS scheduleDate, res.mail_no || '便' AS mailNo, res.mail_no AS mailId,
+        line.linename AS lineName, COALESCE ( item.call_code, item0.call_code ) AS callCode, res.item_id AS itemId, LEFT
+        ( COALESCE ( item.item_name, item0.item_name ), 13 ) AS itemName, COALESCE ( item.n_szname, item0.n_szname ) ||
+        unit.unitname AS itemSpecs, res.store_id, dlvstore.shortname AS storeName, dlvstore.shortname AS storeNameShort,
+        COALESCE ( plan.qy, '0' ) AS qty
+        FROM
+        tmpresult res
+        LEFT JOIN tmpplan plan
+        ON res.dlvsched_date = plan.dlvsched_date
+        AND res.center_id = plan.center_id
+        AND res.mail_no = plan.mail_no
+        AND res.item_id = plan.item_id
+        AND res.store_id = plan.store_id
+        LEFT JOIN centralkitchen.purchasegroupbranches pubr ON res.store_id = pubr.branchcd
+        LEFT JOIN
+        centralkitchen.tm_shohin item
+        ON res.item_id = item.item_id
+        AND res.store_id = item.store_id
+        AND pubr.purchasegroupcd = item.area_id
+        AND item.f_active != 9
+        LEFT JOIN centralkitchen.tm_shohin item0 ON res.item_id = item0.item_id
+        AND item0.store_id = 0
+        AND pubr.purchasegroupcd = item0.area_id
+        AND item0.f_active != 9
+        LEFT JOIN centralkitchen.lines line ON item0.line_id = line.linecd
+        LEFT JOIN centralkitchen.mt_unit unit ON item0.n_szname_typeid = unit.unitcd
+        LEFT JOIN centralkitchen.mt_lotgroup logp ON item0.lotgrp_id = logp.
+        ID LEFT JOIN centralkitchen.branches stor ON res.store_id = stor.branchcd
+        LEFT JOIN centralkitchen.branches cetr ON res.center_id = cetr.branchcd
+        LEFT JOIN  (SELECT DISTINCT store_id,shortname,line_id FROM centralkitchen.mt_centerdlvstore WHERE center_id=#{param.centerId}) dlvstore
+        ON res.store_id = dlvstore.store_id
+        AND dlvstore.line_id = item0.line_id
+        )
+
+        select
+        fin.ID,
+        fin.isClosed,
+        fin.centerName,
+        fin.scheduleDate,
+        fin.mailNo,
+        fin.mailId,
+        fin.lineName,
+        SUBSTRING(grop.NAME, 1, 10) AS workGroupName,
+        fin.callCode,
+        fin.itemId,
+        fin.itemName,
+        fin.itemSpecs,
+        fin.store_id,
+        fin.storeName,
+        fin.storeNameShort,
+        fin.qty
+
+        from tmpfinal fin
+        INNER JOIN centralkitchen.mt_productwkgrp grop
+        ON fin.center_id = grop.center_id
+        AND fin.wkgrp_id = grop.ID
+        AND fin.line_id = grop.line_id
+        INNER JOIN centralkitchen.mt_useline useLine
+        ON fin.line_id = useLine.line_id
+
+        <where>
+            <if test="param.isExceptZero != null and param.isExceptZero == 1">
+                COALESCE (fin.qty, 0) != 0
+            </if>
+        </where>
+
+        ORDER BY
+        fin.scheduleDate,
+        fin.mailId,
+        useLine.seq,
+        fin.line_id,
+        grop.seq,
+        fin.wkgrp_id,
+        fin.callCode,
+        fin.store_id
+    </select>
+    <select id="selectDistributionInstructionSchedPdf"
+            resultType="com.tre.centralkitchen.domain.vo.system.DistributionInstructionPoVo">
+        with tmpTable as (
+        select concat_ws('-',
+        to_char(main.dlvsched_date, 'yyyyMMdd'),
+        main.mail_no,
+        line.linecd,
+        grop.id) as id,
+        stor.isclosed as isClosed,
+        main.center_id as centerId,
+        cetr.branchname as centerName,
+        main.dlvsched_date as scheduleDate,
+        main.mail_no as mailId,
+        main.mail_no || '便' as mailNo,
+        line.linecd as lineId,
+        line.linename as lineName,
+        grop.seq as wkSeq,
+        grop.id as workGroupId,
+        SUBSTRING(grop.name,1,10) as workGroupName,
+        coalesce(item.call_code, item0.call_code) as callCode,
+        main.item_id as itemId,
+        coalesce(item.item_name, item0.item_name) as itemName,
+        coalesce(item.n_szname, item0.n_szname) || unit.unitname as itemSpecs,
+        main.store_id as storeId,
+        dlvstore.shortname as storeName,
+        dlvstore.shortname as storeNameShort,
+        coalesce(main.qy, '0') as qty
+        from centralkitchen.tr_produceplan main
+        left join centralkitchen.purchasegroupbranches pubr
+        on main.store_id = pubr.branchcd
+        left join centralkitchen.tm_shohin item
+        on main.item_id = item.item_id
+        and main.store_id = item.store_id
+        and pubr.purchasegroupcd = item.area_id
+        and item.f_active != 9
+        left join centralkitchen.tm_shohin item0
+        on main.item_id = item0.item_id
+        and item0.store_id = 0
+        and pubr.purchasegroupcd = item0.area_id
+        and item0.f_active != 9
+        left join centralkitchen.mt_productwkgrp grop
+        on main.center_id = grop.center_id
+        and coalesce(item.wkgrp_id,item0.wkgrp_id) = grop.id
+        and item0.line_id = grop.line_id
+        left join centralkitchen.lines line
+        on item0.line_id = line.linecd
+        left join centralkitchen.mt_unit unit
+        on item0.n_szname_typeid = unit.unitcd
+        left join centralkitchen.mt_lotgroup logp
+        on item0.lotgrp_id = logp.id
+        left join centralkitchen.branches cetr
+        on main.center_id = cetr.branchcd
+        left join centralkitchen.branches stor
+        on main.store_id = stor.branchcd
+        LEFT JOIN  (SELECT DISTINCT store_id,shortname,line_id FROM centralkitchen.mt_centerdlvstore WHERE center_id=#{param.centerId}) dlvstore
+        ON main.store_id = dlvstore.store_id
+        AND dlvstore.line_id = item0.line_id
+        where main.center_id = #{param.centerId}
+        and main.dlvsched_date <![CDATA[ >= ]]> #{param.stDate}::date
+        and main.dlvsched_date <![CDATA[ <= ]]> #{param.edDate}::date
+        <if test="param.isExceptZero != null and param.isExceptZero == 1">
+            and main.qy != 0
+        </if>
+        <if test="param.lineIdList != null and !param.lineIdList.isEmpty()">
+            and item0.line_id in
+            <foreach collection="param.lineIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.mailIdList != null and !param.mailIdList.isEmpty()">
+            and main.mail_no in
+            <foreach collection="param.mailIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.workgroupIdList != null and !param.workgroupIdList.isEmpty()">
+            and (item0.wkgrp_id in
+            <foreach collection="param.workgroupIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach> OR item.wkgrp_id in
+            <foreach collection="param.workgroupIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>)
+        </if>
+        and main.f_del= 0
+        )
+        select concat_ws('-', id, callCode, itemId) as id,
+        isClosed as isClosed,
+        centerName as centerName,
+        to_char(scheduleDate, 'yyyy/MM/dd') as scheduleDate,
+        mailNo as mailNo,
+        mailId as mailId,
+        lineId as lineId,
+        lineName as lineName,
+        workGroupId as workGroupId,
+        workGroupName as workGroupName,
+        callCode as callCode,
+        itemId as itemId,
+        left(itemName, 13) as itemName,
+        itemSpecs as itemSpecs,
+        storeId as storeId,
+        storeName as storeName,
+        storeNameShort as storeNameShort,
+        sum(qty) as qty
+        from tmpTable
+        INNER JOIN centralkitchen.mt_useline useLine
+        ON tmpTable.lineId = useLine.line_id
+        <if test="param.isClosed != null and param.isClosed == 1">
+            where isClosed != 1
+        </if>
+        group by id,
+        isClosed,
+        centerName,
+        scheduleDate,
+        mailNo,
+        mailId,
+        itemId,
+        useLine.seq,
+        lineId,
+        lineName,
+        wkSeq,
+        workGroupId,
+        workGroupName,
+        callCode,
+        itemName,
+        itemSpecs,
+        storeId,
+        storeName,
+        storeNameShort
+        ORDER BY
+        scheduleDate,
+        mailNo,
+        useLine.seq,
+        lineId,
+        wkSeq,
+        workGroupId,
+        callCode,
+        storeId
+    </select>
+    <select id="selectStoreListWitchIsExceptClosed"
+            resultType="com.tre.centralkitchen.domain.vo.system.DistributionInstructionPoVo">
+        select distinct
+        main.store_id as storeId,
+        coalesce(st.shortname, '') as storeNameShort,
+        br.isclosed as isClosed,
+        main.center_id,
+        main.mail_no,
+        st.line_id,
+        concat_ws('-', main.center_id, main.mail_no) as id,
+        coalesce(st.seq, main.store_id) as seq
+        from centralkitchen.mt_mailstore main
+        inner join centralkitchen.branches br
+        on main.store_id = br.branchcd
+        left join centralkitchen.mt_centerdlvstore st
+        on main.store_id = st.store_id
+        and main.center_id = st.center_id
+        where main.center_id = #{centerId}
+        <if test="isExceptClosed != null and isExceptClosed == true">
+            and br.isclosed != 1
+        </if>
+        and main.f_del=0
+        ORDER BY main.center_id, main.mail_no, main.store_id
+    </select>
+</mapper>

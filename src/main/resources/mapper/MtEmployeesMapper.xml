@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.MtEmployeesMapper">
+
+    <select id="queryName" resultType="com.tre.centralkitchen.domain.vo.system.MtEmployeesVo">
+        SELECT employeecode,
+               employeename,
+               retirementdivision
+        FROM centralkitchen.employees
+        WHERE (employeecode = #{userId}::int AND coalesce(retirementdivision, 0) NOT IN (1, 2))
+    </select>
+    <select id="getUserName" resultType="com.tre.centralkitchen.domain.vo.system.MtEmployeesVo">
+        SELECT employeecode,
+               employeename,
+               retirementdivision
+        FROM centralkitchen.employees
+        WHERE (employeecode = #{userId}::int)
+    </select>
+</mapper>

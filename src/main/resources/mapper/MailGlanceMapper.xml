@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.MailGlanceMapper">
+    <select id="getMailList" resultType="com.tre.centralkitchen.domain.vo.system.MailListSearchVo">
+        select m.center_id             as centerId,
+               b.branchname            as centerName,
+               concat(m.mail_no, '便') as mail,
+               m.mail_no               as mailNo,
+               m.leadtime+1            as leadTime,
+               count(ms.store_id)      as storeNum,
+               m.discript              as description,
+               m.memo,
+               m.sel_group             as selGroup
+        from centralkitchen.mt_mail m
+                 left join centralkitchen.mt_mailstore ms
+                           on m.center_id = ms.center_id
+                               and m.mail_no = ms.mail_no
+                               and ms.f_del = 0
+                 left join centralkitchen.branches b
+                           on m.center_id = b.branchcd
+        where m.center_id = #{centerId}
+          and m.f_del = 0
+        group by m.center_id, b.branchname, m.mail_no, m.leadtime, m.discript, m.memo, m.sel_group
+        order by m.center_id, m.seq, m.mail_no
+    </select>
+</mapper>

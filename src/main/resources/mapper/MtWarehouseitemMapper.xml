@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.MtWarehouseItemMapper">
+    <select id="search" resultType="com.tre.centralkitchen.domain.vo.system.MtWarehouseItemVo">
+        select item.center_id as centerId , branches.branchname as centerName, mhouse.name as warehouseName,
+        item.warehouse_id as warehouseId,
+        item.item_id as itemId ,shohin.item_name as itemName ,item.seq as seq, item.memo as memo
+        from centralkitchen.mt_warehouseitem item
+        inner join centralkitchen.branches branches on item.center_id = branches.branchcd
+        inner join centralkitchen.mt_warehouse mhouse on item.warehouse_id = mhouse.id
+        left join (select distinct item_id ,item_name ,line_id from centralkitchen.tm_shohin
+        where store_id=0 and f_active!=9 ) shohin
+        on item.item_id = shohin.item_id
+        <where>
+            <if test="bo.centerId != null  ">
+                item.center_id = #{bo.centerId}
+            </if>
+            <if test="bo.warehouseIds != null and bo.warehouseIds.size() >0  ">
+                and item.warehouse_id in
+                <foreach collection="bo.warehouseIds" item="id" open="(" close=")" separator=",">
+                    #{id}
+                </foreach>
+
+            </if>
+            <if test="bo.lineIds != null and bo.lineIds.size() >0">
+                and shohin.line_id in
+                <foreach collection="bo.lineIds" item="id" open="(" close=")" separator=",">
+                    #{id}
+                </foreach>
+            </if>
+            <if test="bo.itemIds != null and bo.itemIds.size() >0 ">
+                and
+                <foreach collection="bo.itemIds" item="id" open="(" close=")" separator="or">
+                    item.item_id = #{id}
+                </foreach>
+            </if>
+            <if test="bo.itemNames != null and bo.itemNames.size() >0  ">
+                and
+                <foreach collection="bo.itemNames" open="(" close=")" item="name" separator="or">
+                    shohin.item_name like concat('%',#{name},'%')
+                </foreach>
+            </if>
+            and item.f_del = 0
+        </where>
+        order by item.center_id,item.warehouse_id, item.seq asc
+    </select>
+
+    <select id="queryWarehouseItem" resultType="com.tre.centralkitchen.domain.vo.system.MtWarehouseItemVo">
+         select distinct mwarehouseitem.center_id  , mwarehouseitem.warehouse_id , mwarehouseitem.item_id , tshohin.item_name as itemName, mwarehouseitem.seq,
+  mwarehouseitem.memo, mwarehouseitem.f_del  ,mwarehouseitem.ins_date  , mwarehouseitem.ins_time  , mwarehouseitem.ins_user_id  , mwarehouseitem.ins_func_id  ,
+   mwarehouseitem.ins_ope_id  , mwarehouseitem.upd_date  , mwarehouseitem.upd_time , mwarehouseitem.upd_user_id , mwarehouseitem.upd_func_id,
+    mwarehouseitem.upd_ope_id
+         from centralkitchen.mt_warehouseitem mwarehouseitem
+        inner join centralkitchen.tm_shohin tshohin on tshohin.item_id = mwarehouseitem.item_id
+          where mwarehouseitem.center_id = #{bo.centerId} and mwarehouseitem.warehouse_id = #{bo.warehouseId}
+          and mwarehouseitem.item_id =  #{bo.itemId}
+    </select>
+</mapper>

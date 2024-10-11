@@ -1,0 +1,477 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.TrProducedMapper">
+    <sql id="sqlAcquireMeterActualResults">
+        ,temp1 as (Select Distinct TBLA.center_id,
+                                       TBLA.mail_no,
+                                       TBLA.store_id,
+                                       TBLA.call_code,
+                                       TBLA.lot_no,
+                                       TBLA.place_id
+                       From (Select center_id,
+                                    column02                             As mail_no,
+                                    cast(column03 as Int)                As call_code,
+                                    column05                             As store_id,
+                                    Ltrim(RTrim(column41))               As lot_no,
+                                    CAST( COALESCE( NULLIF( TRIM(column47),''), '0' ) AS INT ) As place_id
+                             From centralkitchen.wk_recievelcu_produced
+                             Where Ltrim(RTrim(column41)) <![CDATA[ <> ]]> ''
+                               And Ltrim(RTrim(column41)) ~ '^[0-9]*$'  = true
+                               And center_id = #{centerId}
+        And column02 = #{mailNo}
+        Union
+        Select center_id, column02 As mail_no, cast (column03 as Int) As call_code, column05 As store_id, Ltrim(RTrim(column43)) As lot_no, CAST( COALESCE( NULLIF( TRIM(column47),''), '0' ) AS INT ) As place_id
+        From centralkitchen.wk_recievelcu_produced
+        Where Ltrim(RTrim(column43)) <![CDATA[ <> ]]> ''
+        And Ltrim(RTrim(column43)) ~ '^[0-9]*$' = true
+        And center_id = #{centerId}
+        And column02 = #{mailNo}
+        Union
+        Select center_id, column02 As mail_no, cast (column03 as Int) As call_code, column05 As store_id, Ltrim(RTrim(column45)) As lot_no, CAST( COALESCE( NULLIF( TRIM(column47),''), '0' ) AS INT ) As place_id
+        From centralkitchen.wk_recievelcu_produced
+        Where Ltrim(RTrim(column45)) <![CDATA[ <> ]]> ''
+        And Ltrim(RTrim(column45)) ~ '^[0-9]*$' = true
+        And center_id = #{centerId}
+        And column02 = #{mailNo}
+        ) TBLA
+        Order By TBLA.mail_no,
+        TBLA.call_code,
+        TBLA.store_id,
+        TBLA.lot_no,
+        TBLA.place_id),
+        temp2 as (Select CASE WHEN M.call_code IS NULL THEN M1.call_code ELSE M.call_code END AS call_code
+        , CASE
+        WHEN M.pctgt_typeid IS NULL THEN M1.pctgt_typeid
+        ELSE M.pctgt_typeid END                                          AS pctgt_typeid
+        , CASE
+        WHEN M.teikan_typeid IS NULL THEN M1.teikan_typeid
+        ELSE M.teikan_typeid END                                         AS teikan_typeid
+        , CASE WHEN M.item_id IS NULL THEN M1.item_id ELSE M.item_id END       AS item_id
+        , mail_no
+        , SRC.store_id
+        , SRC.place_id
+        , SRC.lot_no
+        , act_qy
+        , weight
+        From (Select PR.column02                                                          as mail_no
+        , PR.column05                                                          as store_id
+        , PR.column03                                                          as call_code
+        , LOT.lot_no
+        , CAST( COALESCE( NULLIF( TRIM(column47),''), '0' ) AS INT )           As place_id
+        , Sum(Case When column16 <![CDATA[>=]]> 3 Then -1 * column10 Else column10 End) As act_qy
+        , Sum(Case When column16 <![CDATA[>=]]> 3 Then -1 * column11 Else column11 End) As weight
+        From centralkitchen.wk_recievelcu_produced As PR
+        Left Join temp1 As LOT
+        On PR.column02 = LOT.mail_no
+        And PR.column05 = LOT.store_id
+        And cast(PR.column03 as int) = LOT.call_code
+        And CAST( COALESCE( NULLIF( TRIM(column47),''), '0' ) AS INT ) = LOT.place_id
+        And PR.center_id = LOT.center_id
+        Where column02 = #{mailNo}
+        Group By PR.column02
+        , PR.column05
+        , PR.column03
+        , LOT.lot_no
+        , PR.column47) SRC
+        Left join tmp_shohin M
+        on M.call_code = cast(SRC.call_code as int)
+        And M.store_id = SRC.store_id
+        And M.pctgt_typeid = 1
+        Left join centralkitchen.purchasegroupbranches W1
+        on W1.branchcd = SRC.store_id
+        Left join tmp_shohin M1
+        on M1.call_code = cast(SRC.call_code as int)
+        And M1.area_id = W1.purchasegroupcd
+        And M1.store_id = 0
+        And M1.pctgt_typeid = 1)
+
+        Update centralkitchen.tr_produced DST
+        Set act_qy      = STC.act_qy
+          , weight      = STC.weight
+          , upd_date    = now()
+          , upd_time    = now()
+          , upd_user_id = #{userId}::int4
+          , upd_func_id = #{funcId}
+          , upd_ope_id = #{opeId}
+          , place_id = cast (STC.place_id as int)
+          , lot_no = STC.lot_no
+        From temp2 STC, centralkitchen.mt_mailcontrol MTB
+        WHERE DST.dlvsched_date = MTB.dlvsched_date
+          And DST.center_id = MTB.center_id
+          And DST.mail_no = MTB.mail_no
+          And DST.mail_no = STC.mail_no
+          And DST.store_id = STC.store_id
+          And DST.item_id = STC.item_id
+          And STC.call_code IS NOT NULL
+          And STC.teikan_typeid in (0
+            , 1
+            , 2)
+          And STC.pctgt_typeid = 1
+          And MTB.center_id=#{centerId}
+          And MTB.mail_no = #{mailNo}
+          And DST.store_id not in (select branchcd from centralkitchen.branches where isclosed = 1)
+    </sql>
+
+    <sql id="sqlAcquireMeterActualResultsNoDirectiOnData">
+        ,temp1 as (Select Distinct TBLA.center_id,
+                                       TBLA.mail_no,
+                                       TBLA.store_id,
+                                       TBLA.call_code,
+                                       TBLA.lot_no,
+                                       TBLA.place_id
+                       From (Select center_id,
+                                    column02                             As mail_no,
+                                    cast(column03 as Int)                As call_code,
+                                    column05                             As store_id,
+                                    Ltrim(RTrim(column41))               As lot_no,
+                                    CAST( COALESCE( NULLIF( TRIM(column47),''), '0' ) AS INT ) As place_id
+                             From centralkitchen.wk_recievelcu_produced
+                             Where Ltrim(RTrim(column41)) <![CDATA[ <>]]> ''
+                               And Ltrim(RTrim(column41)) ~ '^[0-9]*$' = true
+                               And center_id = #{centerId}
+        And column02 = #{mailNo}
+        Union
+        Select
+        center_id, column02 As mail_no, cast (column03 as Int) As call_code, column05 As store_id, Ltrim(RTrim(column43)) As lot_no, CAST( COALESCE( NULLIF( TRIM(column47),''), '0' ) AS INT ) As place_id
+        From
+        centralkitchen.wk_recievelcu_produced
+        Where
+        Ltrim(RTrim(column43)) <![CDATA[ <>]]> ''
+        And Ltrim(RTrim(column43)) ~ '^[0-9]*$' = true
+        And center_id = #{centerId}
+        And column02 = #{mailNo}
+        Union
+        Select
+        center_id, column02 As mail_no, cast (column03 as Int) As call_code, column05 As store_id, Ltrim(RTrim(column45)) As lot_no, CAST( COALESCE( NULLIF( TRIM(column47),''), '0' ) AS INT ) As place_id
+        From
+        centralkitchen.wk_recievelcu_produced
+        Where
+        Ltrim(RTrim(column45)) <![CDATA[ <>]]> ''
+        And Ltrim(RTrim(column45)) ~ '^[0-9]*$' = true
+        And center_id = #{centerId}
+        And column02 = #{mailNo}
+        ) TBLA
+        Order By TBLA.mail_no,
+        TBLA.call_code,
+        TBLA.store_id,
+        TBLA.lot_no,
+        TBLA.place_id)
+
+        Insert
+        Into centralkitchen.tr_produced
+        ( dlvsched_date
+        , center_id
+        , mail_no
+        , store_id
+        , item_id
+        , machine_no
+        , inst_qy
+        , act_qy
+        , weight
+        , cost_rcp
+        , cost_item
+        , price
+        , place_id
+        , lot_no
+        , f_del
+        , ins_date
+        , ins_time
+        , ins_user_id
+        , ins_func_id
+        , ins_ope_id
+        , upd_date
+        , upd_time
+        , upd_user_id
+        , upd_func_id
+        , upd_ope_id)
+        Select TMB.dlvsched_date
+             , A.center_id
+             , A.mail_no
+             , A.store_id
+             , A.item_id
+             , NULL
+             , 0
+             , SUM(
+                CASE WHEN A.process_type <![CDATA[>=]]> 3 THEN -1 * A.qty ELSE A.qty END
+            )
+             , SUM(
+                CASE WHEN A.process_type <![CDATA[>=]]> 3 THEN -1 * A.weight ELSE A.weight END
+            )
+             , A.cost_pc
+             , A.costprice
+             , A.salesprice
+             , cast(A.place_id as int)
+             , A.lot_no
+             , 0
+             , now()
+             , now()
+             , #{userId}::int4
+             , #{funcId}
+             , #{opeId}
+             , now()
+             , now()
+             , #{userId}::int4
+             , #{funcId}
+             , #{opeId}
+        From (select P.center_id                                                                      as center_id
+                   , P.column05                                                                       as store_id
+                   , case when M.item_id is null then M1.item_id else M.item_id end                   as item_id
+                   , P.column02                                                                       as mail_no
+                   , case when M.call_code is null then M1.call_code else M.call_code end             as call_code
+                   , case when M.pctgt_typeid is null then M1.pctgt_typeid else M.pctgt_typeid end    as pctgt_typeid
+                   , case when M.cost_pc is null then M1.cost_pc else M.cost_pc end                   as cost_pc
+                   , case when M.cost is null then M1.cost else M.cost end                            as cost
+                   , case when M.price is null then M1.price else M.price end                         as price
+                   , case when M.teikan_typeid is null then M1.teikan_typeid else M.teikan_typeid end as teikan_typeid
+                   , case when M.wkgrp_id is null then M1.wkgrp_id else M.wkgrp_id end                as wkgrp_id
+                   , P.column16                                                                       as process_type
+                   , P.column10                                                                       as qty
+                   , P.column11                                                                       as weight
+                   , CAST( COALESCE( NULLIF( TRIM(column47),''), '0' ) AS INT )                       As place_id
+                   , LOT.lot_no
+                   , COALESCE(case when M.cost is null then M1.cost else M.cost end,0) as costprice
+                   , COALESCE(case when M.price is null then M1.price else M.price end,0) as salesprice
+              from centralkitchen.wk_recievelcu_produced P
+                       Left Join temp1 As LOT
+                                 On P.center_id = LOT.center_id
+                                     And P.column02 = LOT.mail_no
+                                     And P.column05 = LOT.store_id
+                                     And cast(P.column03 as int) = LOT.call_code
+                                     And CAST( COALESCE( NULLIF( TRIM(column47),''), '0' ) AS INT ) = LOT.place_id
+                       left join tmp_shohin M
+                                 on M.call_code = cast(P.column03 as int)
+                                     And M.store_id = P.column05
+                       left join centralkitchen.purchasegroupbranches W1
+                                 on W1.branchcd = P.column05
+                       left join tmp_shohin M1
+                                 on M1.call_code = cast(P.column03 as int)
+                                     And M1.area_id = W1.purchasegroupcd
+                                     And M1.store_id = 0
+              Where P.column02 = #{mailNo}
+                And P.column05 <![CDATA[ <>]]> 0
+                And M1.pctgt_typeid = 1
+                And P.center_id = #{centerId}) A
+                 Left Join centralkitchen.mt_mailcontrol TMB
+                           on TMB.center_id = #{centerId}
+                               And TMB.mail_no = #{mailNo}
+                 Left Join centralkitchen.tr_produced S
+                           On S.dlvsched_date = TMB.dlvsched_date
+                               And S.center_id = A.center_id
+                               And S.mail_no = A.mail_no
+                               And S.store_id = A.store_id
+                               And S.item_id = A.item_id
+        Where S.item_id IS NULL
+          And A.call_code IS NOT NULL
+          And A.pctgt_typeid = 1
+          And A.store_id not in (select branchcd from centralkitchen.branches where isclosed = 1)
+        Group By TMB.dlvsched_date
+               , A.center_id
+               , A.mail_no
+               , A.store_id
+               , A.item_id
+               , A.wkgrp_id
+               , A.cost_pc
+               , A.costprice
+               , A.salesprice
+               , A.teikan_typeid
+               , A.place_id
+               , A.lot_no
+    </sql>
+
+    <sql id="sqlAcquireMeterActualResultsLot">
+        temp_del as (
+
+        Delete
+        From centralkitchen.tr_traceability s Using centralkitchen.mt_mailcontrol tmb
+        Where s.dlvsched_date = tmb.dlvsched_date
+          And s.center_id=#{centerId}
+        And tmb.center_id=#{centerId}
+        And s.mail_no = #{mailNo}
+        And tmb.mail_no = #{mailNo}
+        )
+
+        Insert
+        Into centralkitchen.tr_traceability
+        (center_id,
+        dlvsched_date,
+        mail_no,
+        store_id,
+        item_id,
+        lot_no,
+        f_del,
+        ins_date,
+        ins_time,
+        ins_user_id,
+        ins_func_id,
+        ins_ope_id,
+        upd_date,
+        upd_time,
+        upd_user_id,
+        upd_func_id,
+        upd_ope_id)
+        Select tmb.center_id,
+               tmb.dlvsched_date,
+               TBLB.mail_no,
+               TBLB.store_id,
+               TBLB.item_id,
+               TBLB.lot_no,
+               0,
+               now(),
+               now(),
+               #{userId}::int4, #{funcId},
+               #{opeId},
+               now(),
+               now(),
+               #{userId}::int4, #{funcId},
+               #{opeId}
+        From (Select Distinct TBLA.mail_no,
+                     TBLA.store_id,
+                     case when M.item_id is null then M1.item_id else M.item_id end as item_id,
+                     TBLA.lot_no
+              From (Select column02               As mail_no,
+                           cast(column03 as int)  As call_code,
+                           column05               As store_id,
+                           Ltrim(RTrim(column41)) As lot_no
+                    From centralkitchen.wk_recievelcu_produced
+                    Where Ltrim(RTrim(column41)) <![CDATA[ <>]]> ''
+                      And Ltrim(RTrim(column41)) ~ '^[0-9]*$' = true
+                            And center_id = #{centerId}
+                      And column02 = #{mailNo}
+                    Union All
+                    Select
+                        column02 As mail_no, cast (column03 as int) As call_code, column05 As store_id, Ltrim(RTrim(column43)) As lot_no
+                    From
+                        centralkitchen.wk_recievelcu_produced
+                    Where
+                        Ltrim(RTrim(column43)) <![CDATA[ <>]]> ''
+                      And Ltrim(RTrim(column43)) ~ '^[0-9]*$' = true
+                      And center_id = #{centerId}
+                      And column02 = #{mailNo}
+                    Union All
+
+                    Select
+                        column02 As mail_no, cast (column03 as int) As call_code, column05 As store_id, Ltrim(RTrim(column45)) As lot_no
+                    From
+                        centralkitchen.wk_recievelcu_produced
+                    Where
+                        Ltrim(RTrim(column45)) <![CDATA[ <>]]> ''
+                      And Ltrim(RTrim(column45)) ~ '^[0-9]*$' = true
+                      And center_id = #{centerId}
+                      And column02 = #{mailNo}) TBLA
+                       left join tmp_shohin M
+                                 on
+                                             M.call_code = TBLA.call_code
+                                         And M.store_id = TBLA.store_id
+                       left join
+                   centralkitchen.purchasegroupbranches W1
+                   on
+                       W1.branchcd = TBLA.store_id
+                       left join tmp_shohin M1
+                                 on
+                                             M1.call_code = TBLA.call_code
+                                         And M1.area_id = W1.purchasegroupcd
+                                         And M1.store_id = 0) TBLB
+                 left join centralkitchen.mt_mailcontrol tmb
+                           ON tmb.center_id = #{centerId}
+                               And tmb.mail_no = #{mailNo}
+        WHERE TBLB.item_id IS NOT NULL
+          And TBLB.store_id <![CDATA[ <>]]> 0
+          And TBLB.store_id not in (select branchcd from centralkitchen.branches where isclosed = 1)
+    </sql>
+
+    <update id="acquireMeterActualResults">
+        update centralkitchen.wk_recievelcu_produced
+        set column47=CAST( COALESCE( NULLIF( TRIM(column47),''), '0' ) AS INT )
+          , column32=CAST( COALESCE( NULLIF( TRIM(column32),''), '0' ) AS INT )
+        where center_id = #{centerId};
+        with tmp_shohin as (
+            SELECT call_code, pctgt_typeid, teikan_typeid, item_id, store_id, area_id
+            FROM
+                centralkitchen.tm_shohin
+            where f_active != 9 and call_code in
+                  (select distinct CAST ( column03 AS INT ) from centralkitchen.wk_recievelcu_produced  where center_id = #{centerId} and column02= #{mailNo})
+        )
+        <include refid="sqlAcquireMeterActualResults"/>
+    </update>
+
+    <update id="acquireMeterActualResultsNoDirectiOnData">
+        with tmp_shohin as (
+            SELECT call_code, pctgt_typeid, teikan_typeid, item_id, store_id, area_id, cost_pc, cost, price, wkgrp_id
+            FROM
+                centralkitchen.tm_shohin
+            where f_active != 9 and call_code in
+                  (select distinct CAST ( column03 AS INT ) from centralkitchen.wk_recievelcu_produced  where center_id = #{centerId} and column02= #{mailNo})
+        )
+        <include refid="sqlAcquireMeterActualResultsNoDirectiOnData"/>
+    </update>
+
+    <update id="acquireMeterActualResultsLot">
+        with tmp_shohin as (SELECT call_code, pctgt_typeid, teikan_typeid, item_id, store_id, area_id
+                            FROM centralkitchen.tm_shohin
+                            where f_active != 9 and call_code in
+                                  (select distinct CAST(column03 AS INT)
+                                   from centralkitchen.wk_recievelcu_produced
+                                   where center_id = #{centerId}
+                                     and column02 = #{mailNo})),
+        <include refid="sqlAcquireMeterActualResultsLot"/>
+    </update>
+
+    <update id="decideActualFixAmountProducts">
+        Update centralkitchen.tr_produced DST
+        Set act_qy      = DST.inst_qy
+          , upd_date    = now()
+          , upd_time    = now()
+          , upd_user_id = #{userId}::int4
+          , upd_func_id = #{funcId}
+          , upd_ope_id  = #{opeId} From centralkitchen.purchasegroupbranches TMS,centralkitchen.tm_shohin M
+        WHERE DST.store_id = TMS.branchcd
+          And DST.item_id = M.item_id
+          And M.store_id = 0
+          And M.area_id=TMS.purchasegroupcd
+          And DST.dlvsched_date = (select dlvsched_date From centralkitchen.mt_mailcontrol Where center_id = #{centerId}
+          And mail_no = #{mailNo})
+          And DST.center_id = #{centerId}
+          And DST.mail_no = #{mailNo}
+          And M.pctgt_typeid = 2
+          And M.f_active != 9
+    </update>
+
+    <update id="acquireMeterActualResultsForHinemos">
+        update centralkitchen.wk_recievelcu_produced
+        set column47=CAST( COALESCE( NULLIF( TRIM(column47),''), '0' ) AS INT )
+          , column32=CAST( COALESCE( NULLIF( TRIM(column32),''), '0' ) AS INT )
+        where center_id = #{centerId};
+        with tmp_shohin as (
+            SELECT call_code, pctgt_typeid, teikan_typeid, item_id, store_id, area_id
+            FROM
+                centralkitchen.tm_shohin_prev
+            where f_active != 9 and call_code in
+                  (select distinct CAST ( column03 AS INT ) from centralkitchen.wk_recievelcu_produced  where center_id = #{centerId} and column02= #{mailNo})
+        )
+        <include refid="sqlAcquireMeterActualResults"/>
+    </update>
+
+    <update id="acquireMeterActualResultsNoDirectiOnDataForHinemos">
+        with tmp_shohin as (
+            SELECT call_code, pctgt_typeid, teikan_typeid, item_id, store_id, area_id, cost_pc, cost, price, wkgrp_id
+            FROM
+                centralkitchen.tm_shohin_prev
+            where f_active != 9 and call_code in
+                  (select distinct CAST ( column03 AS INT ) from centralkitchen.wk_recievelcu_produced  where center_id = #{centerId} and column02= #{mailNo})
+        )
+        <include refid="sqlAcquireMeterActualResultsNoDirectiOnData"/>
+    </update>
+
+    <update id="acquireMeterActualResultsLotForHinemos">
+        with tmp_shohin as (SELECT call_code, pctgt_typeid, teikan_typeid, item_id, store_id, area_id
+                            FROM centralkitchen.tm_shohin_prev
+                            where f_active != 9 and call_code in
+                                  (select distinct CAST(column03 AS INT)
+                                   from centralkitchen.wk_recievelcu_produced
+                                   where center_id = #{centerId}
+                                     and column02 = #{mailNo})),
+        <include refid="sqlAcquireMeterActualResultsLot"/>
+    </update>
+</mapper>

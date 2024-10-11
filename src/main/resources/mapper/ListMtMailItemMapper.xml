@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.ListMtMailItemMapper">
+    <select id="selectBasics" resultType="java.lang.String">
+        select concat_ws('-', main.center_id, main.mail_no, main.store_id) as basics
+        from centralkitchen.mt_mailstore main
+        where main.f_del = 0
+    </select>
+    <select id="selectCases" resultType="java.lang.String">
+        select concat_ws('-', main.center_id, main.item_id,  main.mail_no,main.store_id) as basics
+        from centralkitchen.mt_mailitem main
+        where main.f_del = 0
+    </select>
+</mapper>

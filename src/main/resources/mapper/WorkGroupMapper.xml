@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.WorkGroupMapper">
+    <select id="getWorkGroupList" parameterType="java.util.List"
+            resultType="com.tre.centralkitchen.domain.vo.system.WorkGroupVo">
+        select
+        w1.center_id as centerId,
+        b.branchname as centerName,
+        w1.line_id as lineId,
+        l.linename as lineName,
+        w1.id as groupBig,
+        w1.name as groupBigName,
+        w2.id as groupSmall,
+        w2.name as groupSmallName
+        from centralkitchen.mt_productwkgrp w1
+        left join centralkitchen.mt_productwkgrp w2
+        on w1.id = w2.pid
+        left join centralkitchen.lines l
+        on w1.line_id = l.linecd
+        INNER JOIN centralkitchen.mt_useline useLine ON l.linecd = useLine.line_id
+        left join centralkitchen.branches b
+        on w1.center_id = b.branchcd
+        where
+        w1.pid = 0
+        <if test="centerId != null and centerId != ''">
+            and w1.center_id = #{centerId}
+        </if>
+        <if test="list != null and list.size() > 0">
+            and w1.line_id in
+            <foreach item="item" index="index" collection="list" open="(" separator="," close=")">
+                #{item}::int
+            </foreach>
+        </if>
+        and w1.f_del = 0 and w2.f_del = 0
+        order by useLine.seq,w1.seq,w2.seq,w1.id,w2.id
+    </select>
+
+    <select id="getUpWorkGroup" resultType="com.tre.centralkitchen.domain.vo.system.WorkGroupVo">
+        select
+        w1.center_id as centerId,
+        b.branchname as centerName,
+        w1.line_id as lineId,
+        l.linename as lineName,
+        w1.id as groupBig,
+        w1.name as groupBigName,
+        w2.id as groupSmall,
+        w2.name as groupSmallName,
+        w2.ins_user_id,
+        w2.ins_date,
+        w2.ins_time,
+        w2.upd_user_id,
+        w2.upd_date,
+        w2.upd_time
+        from centralkitchen.mt_productwkgrp w1
+        left join centralkitchen.mt_productwkgrp w2
+        on w1.id = w2.pid and w2.f_del = 0
+        left join centralkitchen.lines l
+        on w1.line_id = l.linecd
+        left join centralkitchen.branches b
+        on w1.center_id = b.branchcd
+        where
+        w1.id=#{param.groupBig}
+        <if test="param.groupSmall!=null and param.groupSmall!=''">
+            and w2.id=#{param.groupSmall}
+        </if>
+        and w1.center_id = #{param.centerId}
+        and w1.line_id = #{param.lineId}::int
+        and w1.pid = 0
+        and w1.f_del = 0
+    </select>
+</mapper>

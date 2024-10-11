@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.IssueCheckDataMapper">
+    <select id="queryList" resultType="com.tre.centralkitchen.domain.vo.system.IssueCheckDataVo">
+        SELECT b.branchname AS centerName,
+        tot.center_id,
+        concat(tot.mail_no,'便') AS mail,
+        tot.mail_no AS mailNo,
+        l.linename as lineName,
+        COALESCE(ts.line_id, ts1.line_id) as lineId,
+        tot.item_id AS itemId,
+        COALESCE(ts.call_code, ts1.call_code) AS callCode,
+        coalesce(ts.item_name,ts1.item_name) AS itemName,
+        tp.qy AS orderNumber,
+        tot.store_id as storeId,
+        dlvstore.shortname as storeName,
+        tot.qy AS deliveryNumber,
+        to_char(tot.dlvsched_date, 'yyyy/MM/dd') as dlvschedDate,
+        mp.name placeName,
+        tot.lot_no AS lotNo,
+        abs(tot.weight_am) AS weightAm,
+        tot.cost_rcp AS costRcp,
+        tot.cost,
+        tot.price,
+        abs(tot.recipe_am) AS costRcpAm,
+        abs(tot.order_am) AS costAm,
+        abs(tot.sales_am) AS priceAm,
+        COALESCE ( ts.teikan_typeid, ts1.teikan_typeid ) as teikanTypeid
+        FROM centralkitchen.tr_out_transitem tot
+        LEFT JOIN centralkitchen.purchasegroupbranches pg ON tot.store_id = pg.branchcd
+        LEFT JOIN centralkitchen.tm_shohin ts
+        on tot.item_id=ts.item_id
+        and pg.purchasegroupcd = ts.area_id
+        AND ts.store_id = tot.store_id
+        and ts.f_active!=9
+        LEFT JOIN centralkitchen.tm_shohin ts1
+        ON pg.purchasegroupcd = ts1.area_id
+        AND tot.item_id = ts1.item_id
+        AND ts1.store_id = 0
+        and ts1.f_active!=9
+        LEFT JOIN centralkitchen.lines l on COALESCE(ts.line_id, ts1.line_id) = l.linecd
+        INNER JOIN centralkitchen.mt_useline useLine ON l.linecd = useLine.line_id
+        LEFT JOIN centralkitchen.tr_produceplan tp
+        ON tp.center_id = tot.center_id AND tp.mail_no = tot.mail_no AND tp.item_id = tot.item_id and
+        tot.dlvsched_date = tp.dlvsched_date and tot.store_id = tp.store_id and tp.f_del=0
+        LEFT JOIN centralkitchen.mt_place mp on tot.place_id = mp.id and mp.f_del=0
+        LEFT JOIN centralkitchen.branches b on tot.center_id = b.branchcd
+        LEFT JOIN  (select distinct store_id,shortname,center_id,line_id from centralkitchen.mt_centerdlvstore) dlvstore
+        ON tot.store_id = dlvstore.store_id
+        AND dlvstore.center_id = tot.center_id
+        AND dlvstore.line_id = COALESCE(ts.line_id, ts1.line_id)
+        where tot.dlvsched_date <![CDATA[>=]]> #{param.startDate}::date and tot.dlvsched_date <![CDATA[<=]]>
+        #{param.endDate}::date
+        and tot.mail_no != 98
+        <if test="param.storeIdList!=null and param.storeIdList.size>0">
+            and tot.store_id in
+            <foreach collection="param.storeIdList" item="storeId" index="index" separator="," open="(" close=")">
+                #{storeId}::int
+            </foreach>
+        </if>
+        <if test="param.lineIdList!=null and param.lineIdList.size>0">
+            and l.linecd in
+            <foreach collection="param.lineIdList" item="lines" index="index" separator="," open="(" close=")">
+                #{lines}::int
+            </foreach>
+        </if>
+        <if test="param.itemId!=null and param.itemId!=''">
+            and tot.item_id=#{param.itemId}
+        </if>
+        <if test="param.callCode!=null and param.callCode!=''">
+            and COALESCE(ts.call_code, ts1.call_code)=#{param.callCode}::int
+        </if>
+        <if test="param.itemName!=null and param.itemName!=''">
+            and (coalesce(ts.item_name,ts1.item_name) like CONCAT ('%',#{param.itemName},'%') or
+            coalesce(ts.item_name_k,ts1.item_name_k) like CONCAT ('%',#{param.itemName},'%'))
+        </if>
+        and tot.f_del=0
+        order by mailNo,useLine.seq,lineId,callCode,storeId,dlvschedDate
+    </select>
+</mapper>

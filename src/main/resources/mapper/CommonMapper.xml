@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.CommonMapper">
+    <select id="getCenterList" resultType="com.tre.centralkitchen.domain.vo.common.CenterListVo">
+        select mc.center_id as centerId, branchname_abbr as centerName, vendor_id as vendorId
+        from centralkitchen.mt_centerstatus mc
+                 inner join centralkitchen.branches b on mc.center_id = b.branchcd
+        where mc.f_del = 0
+          and b.isclosed = 0
+        order by mc.center_id
+    </select>
+    <select id="getLineAllList" resultType="com.tre.centralkitchen.domain.vo.common.LineListVo">
+        select m.line_id as lineId, l.linename as lineName
+        from centralkitchen.mt_useline m
+                 left join centralkitchen.lines l on m.line_id = l.linecd
+        where m.f_del = 0
+        order by m.seq, m.line_id
+    </select>
+    <select id="getBranchList" resultType="com.tre.centralkitchen.domain.vo.common.BranchListVo">
+        SELECT branchcd, branchname
+        from (select distinct branchcd, branchname
+              from centralkitchen.mt_centerdlvstore main
+                       inner join centralkitchen.branches b on main.store_id = b.branchcd
+              where b.isclosed = 0
+                 or (b.isclosed = 1 and b.closeddate > to_char(CURRENT_DATE - INTERVAL '6 month', 'yyyymmdd'))) bran
+        order by bran.branchcd
+    </select>
+    <select id="getStoreName" resultType="com.tre.centralkitchen.domain.vo.common.BranchListVo">
+        select branchcd, branchname
+        from centralkitchen.mt_centerdlvstore main
+                 inner join centralkitchen.branches b on main.store_id = b.branchcd
+        where main.center_id = #{centerId}
+          and main.store_id = #{storeId}
+          and b.isclosed = 0
+    </select>
+    <select id="queryMailBasicStoreList" resultType="com.tre.centralkitchen.domain.vo.common.BranchListVo">
+        SELECT distinct main.store_id as branchcd, b.branchname as branchname
+        FROM centralkitchen.mt_centerdlvstore main
+                 inner join centralkitchen.branches b on main.store_id = b.branchcd
+        where main.center_id = #{centerId}
+          and b.isclosed = 0
+        order by main.store_id
+    </select>
+    <select id="getWarehouse" resultType="com.tre.centralkitchen.domain.vo.common.WarehouseVo">
+        select  center_id as centerId , id, name, name_k as nameK, name_s as nameS , seq
+        from centralkitchen.mt_warehouse where center_id = #{centerId} and f_del = 0
+        order by seq asc
+
+    </select>
+    <select id="getBacteriacheckLList" resultType="com.tre.centralkitchen.domain.vo.common.BacteriacheckListVo">
+        select  id,name from  centralkitchen.mt_type where typetype_id= #{typeId}  and f_del = 0
+        order by seq asc
+    </select>
+
+    <select id="getStoreShortName" resultType="com.tre.centralkitchen.domain.vo.common.StoreShortNameVo">
+        select distinct main.store_id              as store_id,
+                        coalesce(st.shortname, '') as store_short_name,
+                        br.isclosed                as is_closed,
+                        main.center_id,
+                        main.mail_no,
+                        st.line_id
+        from centralkitchen.mt_mailstore main
+                 inner join centralkitchen.branches br
+                            on main.store_id = br.branchcd
+                 left join centralkitchen.mt_centerdlvstore st
+                           on main.store_id = st.store_id
+                               and main.center_id = st.center_id
+        where main.center_id = #{centerId}
+        <if test="isExceptClosed != null and isExceptClosed == true">
+            and br.isclosed != 1
+        </if>
+          and main.f_del = 0
+        order by main.center_id, main.mail_no, main.store_id;
+    </select>
+
+</mapper>

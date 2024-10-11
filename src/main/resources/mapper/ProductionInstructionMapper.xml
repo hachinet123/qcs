@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.ProductionInstructionMapper">
+    <select id="selectProductionInstructionProdt"
+            resultType="com.tre.centralkitchen.domain.vo.system.ProductionInstructionPoVo">
+        with tmpSchedTable as (
+        select dlvsched_date,
+        #{param.stDate}::date + leadtime as s_dlvsched_date,
+        #{param.edDate}::date + leadtime as e_dlvsched_date,
+        mail_no,
+        center_id,
+        leadtime
+        from centralkitchen.mt_mailcontrol
+        where center_id = #{param.centerId}
+        <if test="param.mailIdList != null and !param.mailIdList.isEmpty()">
+            and mail_no in
+            <foreach collection="param.mailIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        and f_del = 0
+        ), tmpTable as (
+        select
+        <choose>
+            <when test="param.totalFlag != null and param.totalFlag == 1">
+                concat_ws('-',
+                to_char(main.dlvsched_date - tmpdate.leadtime, 'yyyyMMdd'),
+                line.linecd,
+                COALESCE ( grop.id, gropstore.id )) as id,
+            </when>
+            <otherwise>
+                concat_ws('-',
+                to_char(main.dlvsched_date - tmpdate.leadtime, 'yyyyMMdd'),
+                line.linecd,
+                COALESCE ( grop.id, gropstore.id ),
+                main.mail_no) as id,
+            </otherwise>
+        </choose>
+        main.center_id as centerId,
+        cetr.branchname as centerName,
+        main.dlvsched_date - tmpdate.leadtime as scheduleDate,
+        main.mail_no as mailId,
+        main.mail_no || '便' as mailNo,
+        line.linecd as lineId,
+        line.linename as lineName,
+        COALESCE ( grop.id, gropstore.id ) AS workGroupId,
+        COALESCE ( grop.name, gropstore.name ) AS workGroupName,
+        coalesce(item.call_code, item0.call_code) as callCode,
+        coalesce(item.item_name, item0.item_name) as itemName,
+        coalesce(item.item_name_k, item0.item_name_k) as itemNameK,
+        main.item_id as itemId,
+        main.qy as qty,
+        case
+        when coalesce(item.teikan_typeid, item0.teikan_typeid) = 2 then '定貫(計量あり)'
+        when coalesce(item.teikan_typeid, item0.teikan_typeid) = 1 then '定貫'
+        else '不定貫' end as itemWeigh,
+        coalesce(item.n_szname, item0.n_szname) || unitsp.unitname as itemSpecs,
+        coalesce(item.volume, item0.volume) || unitvl.unitname as itemContent,
+        left(plac.name, 8) as itemPlace,
+        left(logp.name, 8) as batchGroupName,
+        logp.id || ':' || left(logp.name, 8) as batchGroup,
+        logp.id as batchGroupId
+        from centralkitchen.tr_produceplan main
+        inner join tmpSchedTable tmpdate
+        on main.center_id = tmpdate.center_id
+        and main.mail_no = tmpdate.mail_no
+        and main.dlvsched_date <![CDATA[ >= ]]> tmpdate.s_dlvsched_date
+        and main.dlvsched_date <![CDATA[ <= ]]> tmpdate.e_dlvsched_date
+        left join centralkitchen.purchasegroupbranches pubr
+        on main.store_id = pubr.branchcd
+        left join centralkitchen.tm_shohin item
+        on main.item_id = item.item_id
+        and main.store_id = item.store_id
+        and pubr.purchasegroupcd = item.area_id
+        and item.f_active != 9
+        left join centralkitchen.tm_shohin item0
+        on main.item_id = item0.item_id
+        and item0.store_id = 0
+        and pubr.purchasegroupcd = item0.area_id
+        and item0.f_active != 9
+        left join centralkitchen.mt_productwkgrp grop
+        on main.center_id = grop.center_id
+        and item0.wkgrp_id = grop.id
+        and item0.line_id = grop.line_id
+        LEFT JOIN centralkitchen.mt_productwkgrp gropstore ON main.center_id = gropstore.center_id
+        AND item.wkgrp_id = gropstore.ID
+        AND item.line_id = gropstore.line_id
+        left join centralkitchen.lines line
+        on item0.line_id = line.linecd
+        left join centralkitchen.mt_unit unitsp
+        on item0.n_szname_typeid = unitsp.unitcd
+        left join centralkitchen.mt_unit unitvl
+        on item0.volume_typeid = unitvl.unitcd
+        left join centralkitchen.mt_lotgroup logp
+        on item0.lotgrp_id = logp.id
+        left join centralkitchen.mt_place plac
+        on item0.place_id = plac.id
+        left join centralkitchen.branches cetr
+        on main.center_id = cetr.branchcd
+        where main.center_id = #{param.centerId}
+        <if test="param.lineIdList != null and !param.lineIdList.isEmpty()">
+            and item0.line_id in
+            <foreach collection="param.lineIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.mailIdList != null and !param.mailIdList.isEmpty()">
+            and main.mail_no in
+            <foreach collection="param.mailIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.workgroupIdList != null and !param.workgroupIdList.isEmpty()">
+            and (item0.wkgrp_id in
+            <foreach collection="param.workgroupIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach> OR item.wkgrp_id in
+            <foreach collection="param.workgroupIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>)
+        </if>
+        and main.f_del= 0
+        )
+        select
+        centerId,
+        lineId,
+        id as id,
+        centerName as centerName,
+        to_char(scheduleDate, 'yyyy/MM/dd') as scheduleDate,
+        mailNo as mailNo,
+        mailId as mailId,
+        lineName as lineName,
+        workGroupId as workGroupId,
+        workGroupName as workGroupName,
+        callCode as callCode,
+        left(itemName, 13) as itemName,
+        itemId as itemId,
+        sum(qty) as qty,
+        itemWeigh as itemWeigh,
+        itemSpecs as itemSpecs,
+        itemContent as itemContent,
+        itemPlace as itemPlace,
+        batchGroupName as batchGroupName,
+        batchGroup as batchGroup,
+        batchGroupId as batchGroupId
+        from tmpTable
+        INNER JOIN centralkitchen.mt_useline useLine
+        ON tmpTable.lineId = useLine.line_id
+            group by
+            centerId,
+            lineId,
+            id,
+            centerName,
+            scheduleDate,
+            mailId,
+            mailNo,
+            useLine.seq,
+            lineName,
+            workGroupId,
+            workGroupName,
+            callCode,
+            itemId,
+            itemName,
+            itemNameK,
+            itemWeigh,
+            itemSpecs,
+            itemContent,
+            itemPlace,
+            batchGroupName,
+            batchGroup,
+            batchGroupId
+            ORDER BY
+            scheduleDate,
+            useLine.seq,
+            lineId,
+            workGroupId,
+            mailId,
+            callCode,
+            itemNameK
+
+    </select>
+    <select id="selectProductionInstructionSched"
+            resultType="com.tre.centralkitchen.domain.vo.system.ProductionInstructionPoVo">
+        with tmpTable as (
+        select
+        <choose>
+            <when test="param.totalFlag != null and param.totalFlag == 1">
+                concat_ws('-',
+                to_char(main.dlvsched_date, 'yyyyMMdd'),
+                line.linecd,
+                COALESCE ( grop.id, gropstore.id )) as id,
+            </when>
+            <otherwise>
+                concat_ws('-',
+                to_char(main.dlvsched_date, 'yyyyMMdd'),
+                line.linecd,
+                COALESCE ( grop.id, gropstore.id ),
+                main.mail_no) as id,
+            </otherwise>
+        </choose>
+        main.center_id as centerId,
+        cetr.branchname as centerName,
+        main.dlvsched_date as scheduleDate,
+        main.mail_no as mailId,
+        main.mail_no || '便' as mailNo,
+        line.linecd as lineId,
+        line.linename as lineName,
+        COALESCE ( grop.id, gropstore.id ) AS workGroupId,
+        COALESCE ( grop.name, gropstore.name ) AS workGroupName,
+        coalesce(item.call_code, item0.call_code) as callCode,
+        coalesce(item.item_name, item0.item_name) as itemName,
+        coalesce(item.item_name_k, item0.item_name_k) as itemNameK,
+        main.item_id as itemId,
+        main.qy as qty,
+        case
+        when coalesce(item.teikan_typeid, item0.teikan_typeid) = 2 then '定貫(計量あり)'
+        when coalesce(item.teikan_typeid, item0.teikan_typeid) = 1 then '定貫'
+        else '不定貫' end as itemWeigh,
+        coalesce(item.n_szname, item0.n_szname) || unitsp.unitname as itemSpecs,
+        coalesce(item.volume, item0.volume) || unitvl.unitname as itemContent,
+        left(plac.name, 8) as itemPlace,
+        left(logp.name, 8) as batchGroupName,
+        logp.id || ':' || left(logp.name, 8) as batchGroup,
+        logp.id as batchGroupId
+        from centralkitchen.tr_produceplan main
+        left join centralkitchen.purchasegroupbranches pubr
+        on main.store_id = pubr.branchcd
+        left join centralkitchen.tm_shohin item
+        on main.item_id = item.item_id
+        and main.store_id = item.store_id
+        and pubr.purchasegroupcd = item.area_id
+        and item.f_active != 9
+        left join centralkitchen.tm_shohin item0
+        on main.item_id = item0.item_id
+        and item0.store_id = 0
+        and pubr.purchasegroupcd = item0.area_id
+        and item0.f_active != 9
+        left join centralkitchen.mt_productwkgrp grop
+        on main.center_id = grop.center_id
+        and item0.wkgrp_id = grop.id
+        and item0.line_id = grop.line_id
+        LEFT JOIN centralkitchen.mt_productwkgrp gropstore ON main.center_id = gropstore.center_id
+        AND item.wkgrp_id = gropstore.ID
+        AND item.line_id = gropstore.line_id
+        left join centralkitchen.lines line
+        on item0.line_id = line.linecd
+        left join centralkitchen.mt_unit unitsp
+        on item0.n_szname_typeid = unitsp.unitcd
+        left join centralkitchen.mt_unit unitvl
+        on item0.volume_typeid = unitvl.unitcd
+        left join centralkitchen.mt_lotgroup logp
+        on item0.lotgrp_id = logp.id
+        left join centralkitchen.mt_place plac
+        on item0.place_id = plac.id
+        left join centralkitchen.branches cetr
+        on main.center_id = cetr.branchcd
+        where main.center_id = #{param.centerId}
+        and main.dlvsched_date <![CDATA[ >= ]]> #{param.stDate}::date
+        and main.dlvsched_date <![CDATA[ <= ]]> #{param.edDate}::date
+        <if test="param.lineIdList != null and !param.lineIdList.isEmpty()">
+            and item0.line_id in
+            <foreach collection="param.lineIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.mailIdList != null and !param.mailIdList.isEmpty()">
+            and main.mail_no in
+            <foreach collection="param.mailIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.workgroupIdList != null and !param.workgroupIdList.isEmpty()">
+            and (item0.wkgrp_id in
+            <foreach collection="param.workgroupIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach> OR item.wkgrp_id in
+            <foreach collection="param.workgroupIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>)
+        </if>
+        and main.f_del= 0
+        )
+        select id as id,
+        lineId,
+        centerName as centerName,
+        to_char(scheduleDate, 'yyyy/MM/dd') as scheduleDate,
+        mailNo as mailNo,
+        mailId as mailId,
+        lineName as lineName,
+        workGroupId as workGroupId,
+        workGroupName as workGroupName,
+        callCode as callCode,
+        left(itemName, 13) as itemName,
+        itemId as itemId,
+        sum(qty) as qty,
+        itemWeigh as itemWeigh,
+        itemSpecs as itemSpecs,
+        itemContent as itemContent,
+        itemPlace as itemPlace,
+        batchGroupName as batchGroupName,
+        batchGroup as batchGroup,
+        batchGroupId as batchGroupId
+        from tmpTable
+        INNER JOIN centralkitchen.mt_useline useLine
+        ON tmpTable.lineId = useLine.line_id
+        group by id,
+        centerName,
+        scheduleDate,
+        lineId,
+        mailId,
+        mailNo,
+        useLine.seq,
+        lineName,
+        workGroupId,
+        workGroupName,
+        callCode,
+        itemId,
+        itemName,
+        itemNameK,
+        itemWeigh,
+        itemSpecs,
+        itemContent,
+        itemPlace,
+        batchGroupName,
+        batchGroup,
+        batchGroupId
+        ORDER BY
+        scheduleDate,
+        useLine.seq,
+        lineId,
+        workGroupId,
+        mailId,
+        callCode,
+        itemNameK
+    </select>
+</mapper>

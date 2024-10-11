@@ -1,0 +1,62 @@
+spring:
+  datasource:
+    dynamic:
+      hikari:
+        min-idle: 10
+        max-pool-size: 10
+        connection-timeout: 30000
+      primary: postgres
+      p6spy: false
+      datasource:
+        postgres:
+          type: com.zaxxer.hikari.HikariDataSource
+          driverClassName: org.postgresql.Driver
+          url: jdbc:postgresql://10.100.1.44:45432/centralkitchen
+          username: postgres
+          password: ENC(v0hCKAIdvcRXG7idrNh6OQ==)
+        sqlserver:
+          type: com.zaxxer.hikari.HikariDataSource
+          driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
+          url: jdbc:sqlserver://192.168.1.129:1433; DatabaseName=dbOrder;
+          username: freshorder
+          password: ENC(qkQM02liXxNveGLsOfesyg==)
+  mail:
+    host: cn.tre-inc.com
+    username: xxxxxxxxx@cn.tre-inc.com
+    password: ENC(TN9p6M/bT0dCB2XaLsVgcQ==)
+    default-encoding: UTF-8
+    protocol: smtp
+
+  redis:
+    host: xxx.xxx.xxx.xxx
+    port: 6379
+    database: 0
+    password:
+    timeout: 1000
+    lettuce:
+      pool:
+        max-active: 8
+        max-wait: 10000
+        max-idle: 8
+        min-idle: 0
+      shutdown-timeout: 100
+
+logging:
+  config: classpath:logback-spring-dev.xml
+
+login:
+  url: https://auth.trechina.cn/Apps/authentication/authenticate
+  key: da5ec060-caf0-4e4d-acb2-5c485d9746df
+
+menu:
+  masterAuthority: 13
+  userAuthority: 16
+
+LinkSubIp:
+  ip20: 172.21.16.157
+  ip120: 172.21.17.48
+
+print:
+  print-url: http://172.21.17.73:8080/PrintCommonAPI/PrintCenterService/getPrintCenter?
+  #  print-file-url: http://172.17.4.30:8083/ck/file/download/
+  print-file-url: http://172.21.17.166:10803/ck/api/file/download/

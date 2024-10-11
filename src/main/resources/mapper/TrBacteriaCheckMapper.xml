@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.TrBacteriaCheckMapper">
+
+    <select id="search" resultType="com.tre.centralkitchen.domain.vo.system.TrBacteriaCheckVo">
+
+        select tcheck.id, mtype.name as checkstatType ,tcheck.title as title,
+        branches.branchname_abbr as centerName ,count(item.seq) as counts ,
+        tcheck.req_date as reqDate,
+        employees.employeename as reqUserName,
+        CASE tcheck.checkstat_typeid WHEN 3 THEN   max(results.upd_date)  WHEN 4 THEN  max(results.upd_date)  ELSE  null END as checkDate ,
+        CASE tcheck.checkstat_typeid WHEN 2 THEN '入力' WHEN 3 THEN '確認' WHEN 4 THEN '確認' ELSE '' END AS checkResult
+        from centralkitchen.tr_bacteriacheck tcheck
+        inner join centralkitchen.mt_type mtype on tcheck.checkstat_typeid = mtype.id
+        inner join centralkitchen.employees employees on tcheck.req_user_id = employees.employeecode
+        inner join centralkitchen.branches branches on tcheck.center_id = branches.branchcd
+        left join centralkitchen.tr_bacteriacheck_item item on tcheck.id = item.id
+        left join centralkitchen.tr_bacteriacheck_item_result results on results.id = item.id and results.seq = item.seq
+        <where>
+         mtype.typetype_id = 1024
+        <if test="param.centerId != null ">
+            and tcheck.center_id = #{param.centerId}
+        </if>
+        <if test="param.id != null ">
+            and tcheck.id = #{param.id}
+        </if>
+
+        <if test="param.title != null">
+            and tcheck.title like concat('%', #{param.title}, '%')
+        </if>
+        <if test="param.reqUserName != null ">
+            and employees.employeename like concat('%', #{param.reqUserName}, '%')
+        </if>
+        <if test="param.beginTime != null and param.endTime != null ">
+            and tcheck.req_date between #{param.beginTime} and #{param.endTime}
+        </if>
+        <if test="param.checkstatTypeid != null and !param.checkstatTypeid.isEmpty()">
+            and tcheck.checkstat_typeid in
+            <foreach collection="param.checkstatTypeid" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        and tcheck.f_del = 0
+        </where>
+        group by tcheck.id, mtype.name ,tcheck.title ,
+        branches.branchname_abbr , tcheck.req_date ,employees.employeename, results.upd_date, results.upd_time
+        order by tcheck.id DESC
+
+    </select>
+
+
+    <select id="selectTrBacteriaCheckCSVVo" resultType="com.tre.centralkitchen.domain.vo.system.TrBacteriaCheckCSVVo">
+        select tcheck.id, item.seq as seq, checkstate.name as checkstatType, tcheck.title, branches.branchname_abbr as
+        branChnameAbbr, tcheck.req_date as reqDate,
+        tcheck.req_user_id as reqUserId,employees.employeename as reqUserName ,item.check_item as checkItem ,
+        item.produce_date as produceDate,
+        item.otherchecktime as checkDate ,item.qy as qy , tempZone.name as tempZoneName ,checkType.name as checkObjName
+        ,
+        CASE item.f_heated WHEN 0 THEN '加熱処理済製品' WHEN 1 THEN '未加熱製品' ELSE '' END as fHeated ,
+        item.item_name as itemName,
+        CASE item.f_progress WHEN 0 THEN '必要' WHEN 1 THEN '不要' ELSE '' END as fProgress
+        from centralkitchen.tr_bacteriacheck tcheck
+        LEFT JOIN centralkitchen.branches branches on tcheck.center_id = branches.branchcd
+        LEFT JOIN centralkitchen.employees employees on tcheck.req_user_id = employees.employeecode
+        LEFT JOIN centralkitchen.tr_bacteriacheck_item item on tcheck.id = item.id
+        LEFT JOIN
+        (select id,name from centralkitchen.mt_type mtype where mtype.typetype_id =1024)
+        as checkstate
+        on tcheck.checkstat_typeid = checkstate.id
+
+        LEFT JOIN
+        (select id,name from centralkitchen.mt_type mtype where mtype.typetype_id =1016 )
+        as tempZone
+        on item.tempzone_typeid = tempZone.id
+
+        LEFT JOIN
+        (select id,name from centralkitchen.mt_type mtype where mtype.typetype_id =1023 )
+        as checkType
+        on item.checkobj_typeid = checkType.id
+        <where>
+        <if test="param.centerId != null ">
+            tcheck.center_id = #{param.centerId}
+        </if>
+        <if test="param.id != null ">
+            and tcheck.id = #{param.id}
+        </if>
+
+        <if test="param.title != null">
+            and tcheck.title like concat('%', #{param.title}, '%')
+        </if>
+        <if test="param.reqUserName != null ">
+            and employees.employeename like concat('%', #{param.reqUserName}, '%')
+        </if>
+        <if test="param.beginTime != null and param.endTime != null ">
+            and tcheck.req_date between #{param.beginTime} and #{param.endTime}
+        </if>
+        <if test="param.checkstatTypeid != null and !param.checkstatTypeid.isEmpty()">
+            and tcheck.checkstat_typeid in
+            <foreach collection="param.checkstatTypeid" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        and tcheck.f_del = 0
+        </where>
+        order by tcheck.id DESC
+    </select>
+    <select id="selectTrBacteriacheckTimeCheckDateVo"
+            resultType="com.tre.centralkitchen.domain.vo.system.TrBacteriaCheckTimeCheckDateVo">
+        select checkTime.id, checkTime.seq, mtype.name as checkDate from centralkitchen.tr_bacteriacheck_time checkTime
+        inner join centralkitchen.mt_type mtype
+        on checkTime.checktime_typeid = mtype.id
+        where mtype.typetype_id = 1022
+        <if test="param != null and !param.isEmpty()">
+            and checkTime.id in
+            <foreach collection="param" open="(" close=")" index="index" item="item" separator=",">
+                #{item.id}
+            </foreach>
+            and checkTime.seq in
+            <foreach collection="param" open="(" close=")" index="index" item="item" separator=",">
+                #{item.seq}
+            </foreach>
+
+        </if>
+
+    </select>
+    <select id="createId" resultType="com.tre.centralkitchen.domain.vo.system.SysparamVo">
+
+        select param_val1, param_val2  from centralkitchen.mt_sysparam where system_id=1 and param_id=4
+    </select>
+
+    <select id="selectTrBacteriaCheck" resultType="com.tre.centralkitchen.domain.po.TrBacteriaCheck"
+            parameterType="java.lang.Integer">
+        select id, title, recipe_id, checkstat_typeid, center_id, othercenter, req_user_id, req_date, memo, comment,
+        f_del, ins_date, ins_time, ins_user_id, ins_func_id, ins_ope_id, upd_date, upd_time,
+        upd_user_id, upd_func_id, upd_ope_id
+         from centralkitchen.tr_bacteriacheck  where id = #{id} and f_del = 0
+
+    </select>
+    <select id="bacteriaCheckItemSelect" resultType="com.tre.centralkitchen.domain.vo.system.BacteriaCheckItemVo"
+            parameterType="java.lang.Integer">
+         select seq ,  check_item,  produce_date as productDate, qy, item_name,tempzone_typeid as tempZoneTypeId, checkobj_typeid as checkObjTypeId,
+         f_heated as fHeated , f_progress as fProgress, otherchecktime as otherCheckDate
+         from  centralkitchen.tr_bacteriacheck_item
+          where id = #{id} and f_del = 0
+
+    </select>
+    <select id="bacteriaCheckTimeSelect" resultType="com.tre.centralkitchen.domain.po.TrBacteriaCheckTime">
+        select id , seq, checktime_typeid as checktimeTypeid from centralkitchen.tr_bacteriacheck_time where  id = #{id} and f_del = 0
+
+    </select>
+
+
+    <select id="selectEmailReceiver" resultType="com.tre.centralkitchen.domain.po.EmailReceiver">
+        select task_id as taskId , subtask_id as subTaskId , task_name as taskName, to_email as toEmail, cc_email  as ccEmail, bcc_email as bccEmail, f_del, ins_date, ins_time, ins_user_id, ins_func_id,
+        ins_ope_id, upd_date, upd_time,upd_user_id, upd_func_id, upd_ope_id
+        from  centralkitchen.mt_emailreceiver
+        where task_id = 1 and subtask_id = 1 and f_del = 0
+
+
+    </select>
+    <select id="selectreqName" resultType="com.tre.centralkitchen.domain.vo.system.BacteriaCheckVo">
+         select tcheck.id, tcheck.title, tcheck.recipe_id, tcheck.checkstat_typeid as checkStatTypeId, checkstate.name as checkStatTypeName , tcheck.center_id,
+  tcheck.othercenter, tcheck.req_user_id, employees.employeename  as reqUserName , tcheck.req_date, tcheck.memo, tcheck.comment
+         from centralkitchen.tr_bacteriacheck tcheck
+		 inner join  (select id,name from centralkitchen.mt_type mtype  where mtype.typetype_id =1024)
+		as checkstate
+		on tcheck.checkstat_typeid = checkstate.id
+		inner join  centralkitchen.employees employees on tcheck.req_user_id = employees.employeecode
+		 where tcheck.id = #{id} and tcheck.f_del = 0
+
+
+    </select>
+
+    <update id="updateParamVal1">
+            update centralkitchen.mt_sysparam
+             set param_val1 = #{param1}
+             where system_id=1 and param_id=4 and f_del = 0
+    </update>
+
+
+
+
+</mapper>

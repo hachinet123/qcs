@@ -1,0 +1,59 @@
+<settings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 http://maven.apache.org/xsd/settings-1.2.0.xsd">
+
+    <profiles>
+        <profile>
+            <repositories>
+                <repository>
+                    <snapshots>
+                        <enabled>true</enabled>
+                    </snapshots>
+                    <id>central</id>
+                    <name>maven-central</name>
+                    <url>https://code.trechina.cn/package/repository/maven-central/</url>
+                </repository>
+            </repositories>
+            <pluginRepositories>
+                <pluginRepository>
+                    <snapshots>
+                        <enabled>true</enabled>
+                    </snapshots>
+                    <id>central</id>
+                    <name>maven-central</name>
+                    <url>https://code.trechina.cn/package/repository/maven-central/</url>
+                </pluginRepository>
+            </pluginRepositories>
+            <id>maven-central</id>
+        </profile>
+        <profile>
+            <repositories>
+                <repository>
+                    <snapshots>
+                        <enabled>true</enabled>
+                    </snapshots>
+                    <id>nexus</id>
+                    <name>nexus-private</name>
+                    <url>https://code.trechina.cn/package/repository/nexus-private/</url>
+                </repository>
+            </repositories>
+            <pluginRepositories>
+                <pluginRepository>
+                    <snapshots>
+                        <enabled>true</enabled>
+                    </snapshots>
+                    <id>nexus</id>
+                    <name>nexus-private</name>
+                    <url>https://code.trechina.cn/package/repository/nexus-private/</url>
+                </pluginRepository>
+            </pluginRepositories>
+            <id>nexus-private</id>
+        </profile>
+    </profiles>
+
+    <activeProfiles>
+        <activeProfile>maven-central</activeProfile>
+        <activeProfile>nexus-private</activeProfile>
+    </activeProfiles>
+
+</settings>

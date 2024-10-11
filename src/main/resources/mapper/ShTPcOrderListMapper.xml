@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.ShTPcOrderListMapper">
+    <insert id="mailBasicInsertHistory">
+        declare
+        @now DATETIME;
+        set
+        @now = GETDATE();
+        insert into BackupDB.dbo.shT_PcOrderList_History(BackupDate,
+                                                         BranchCD,
+                                                         JAN,
+                                                         Bin,
+                                                         ListNo,
+                                                         Level1,
+                                                         RowNo,
+                                                         StartDate,
+                                                         EndDate,
+                                                         UpdateUser,
+                                                         UpdateDate,
+                                                         PcCode)
+        select @now,
+               BranchCD,
+               JAN,
+               Bin,
+               ListNo,
+               Level1,
+               RowNo,
+               StartDate,
+               EndDate,
+               UpdateUser,
+               UpdateDate,
+               PcCode
+        from dbo.shT_PcOrderList
+        where BranchCD = #{storeId}
+          and Bin = #{mainNo}
+          and PcCode = #{vendorId}
+    </insert>
+    <insert id="mailItemInsertHistory">
+        declare
+        @now DATETIME;
+        set
+        @now = GETDATE();
+        insert into BackupDB.dbo.shT_PcOrderList_History(BackupDate,
+                                                         BranchCD,
+                                                         JAN,
+                                                         Bin,
+                                                         ListNo,
+                                                         Level1,
+                                                         RowNo,
+                                                         StartDate,
+                                                         EndDate,
+                                                         UpdateUser,
+                                                         UpdateDate,
+                                                         PcCode)
+        select @now,
+               BranchCD,
+               JAN,
+               Bin,
+               ListNo,
+               Level1,
+               RowNo,
+               StartDate,
+               EndDate,
+               UpdateUser,
+               UpdateDate,
+               PcCode
+        from dbo.shT_PcOrderList
+        where BranchCD = #{storeId}
+          and JAN = #{itemId}
+          and Bin = #{mailNo}
+          and PcCode = #{vendorId}
+    </insert>
+    <insert id="mailItemFmtInsertHistory">
+        declare
+        @now DATETIME;
+        set
+        @now = GETDATE();
+        insert into BackupDB.dbo.shT_PcOrderList_History(BackupDate,
+                                                         BranchCD,
+                                                         JAN,
+                                                         Bin,
+                                                         ListNo,
+                                                         Level1,
+                                                         RowNo,
+                                                         StartDate,
+                                                         EndDate,
+                                                         UpdateUser,
+                                                         UpdateDate,
+                                                         PcCode)
+        select @now,
+               BranchCD,
+               JAN,
+               Bin,
+               ListNo,
+               Level1,
+               RowNo,
+               StartDate,
+               EndDate,
+               UpdateUser,
+               UpdateDate,
+               PcCode
+        from dbo.shT_PcOrderList
+        where BranchCD = convert(int, #{param.storeId})
+          and JAN = #{param.itemId}
+          and PcCode = #{vendorId}
+    </insert>
+    <update id="updateSqlServerOrderList" parameterType="java.util.List">
+        <if test="list != null and !list.isEmpty()">
+            <foreach collection="list" index="index" item="param" separator=";">
+                update dbo.shT_PcOrderList
+                set Bin=#{param.mailNo},
+                UpdateUser=#{userId},
+                UpdateDate=#{date}
+                where BranchCD=#{param.branchCd} and JAN=#{param.itemId} and Bin=#{mailNo} and ListNo=#{param.listNo}
+                and PcCode=#{param.pcCode}
+            </foreach>
+        </if>
+    </update>
+    <update id="updateSqlServerOrderQty">
+        <if test="list != null and !list.isEmpty()">
+            <foreach collection="list" index="index" item="param" separator=";">
+                update dbo.shT_OrderQty_test
+                set Bin=#{param.bin},
+                UserCD=#{userId},
+                UpdateTime=#{date}
+                where ProdJAN=#{param.prodJAN} and BranchCD=#{param.branchCD} and SupplierCD=#{param.supplierCD}
+                and DeliveryDate=#{param.deliveryDate} and Bin=#{mailNo}
+            </foreach>
+        </if>
+    </update>
+    <resultMap id="total" type="com.tre.centralkitchen.common.domain.CustomPageData"/>
+    <resultMap id="vo" type="com.tre.centralkitchen.domain.vo.system.ListMtMailItemVo"/>
+    <select id="queryList" resultMap="total, vo">
+        CREATE TABLE #product(
+        地域CD INT,
+        商品CD VARCHAR(13),
+        店CD INT,
+        ベンダーCD INT,
+        廃盤区分 tinyint,
+        商品名 VARCHAR(50),
+        グループCD INT,
+        呼出品番 INT,
+        商品名カナ VARCHAR(50)
+        )
+        create clustered index ix_clu_for_product on #product(地域CD,商品CD,店CD,ベンダーCD,廃盤区分)
+        insert into #product
+        select
+        地域CD,商品CD,店CD,ベンダーCD,廃盤区分,商品名,グループCD,呼出品番,商品名カナ
+        from [${ip120}].PF_Master.dbo.T_M商品 t
+        where 1=1
+        <if test="param.linesList!=null and param.linesList.size>0">
+            and t.グループCD in
+            <foreach collection="param.linesList" item="lines" index="index" separator="," open="(" close=")">
+                CAST(#{lines} as int)
+            </foreach>
+        </if>
+        and t.廃盤区分 != 9
+
+        select
+        ROW_NUMBER() OVER(ORDER BY useLine.seq,l.LineCD,main.Bin,coalesce(sp.呼出品番, sp1.呼出品番),main.JAN,main.BranchCD) as id,
+        CAST(#{param.centerId} as varchar)+'-'+cast(main.Bin as varchar)+'-'+cast(main.BranchCD as varchar) as basics,
+        CAST(#{param.centerId} as varchar)+'-'+cast(main.JAN as varchar)+'-'+cast(main.Bin as
+        varchar)+'-'+cast(main.BranchCD as
+        varchar) as cases,
+        #{param.centerName} as centerName,
+        sp1.グループCD as lineId,
+        l.LineName as lineName,
+        main.JAN as itemId,
+        sp1.商品名 as itemName,
+        main.BranchCD as storeId,
+        b.BranchName as storeName,
+        main.Bin as mailNo,
+        coalesce(sp.呼出品番, sp1.呼出品番) as callCode,
+        CAST(main.Bin as varchar)+'便' as mail
+        into #record
+        from dbOrder.dbo.shT_PcOrderList main
+
+        left join MasterDB.dbo.PurchaseGroupBranches p
+        on main.BranchCD = p.BranchCD
+        left join #product sp
+        on p.PurchaseGroupCD = sp.地域CD
+        and main.JAN = sp.商品CD
+        and main.BranchCD = sp.店CD
+
+        left join #product sp1
+        on p.PurchaseGroupCD = sp1.地域CD
+        and main.JAN = sp1.商品CD
+        and sp1.店CD = 0
+
+        left join MasterDB.dbo.Branches b
+        on main.BranchCD = b.BranchCD
+        left join MasterDB.dbo.Lines l
+        on sp1.グループCD = l.LineCD
+
+        INNER JOIN dbOrder.dbo.MtUseLine useLine
+        ON l.LineCD = useLine.line_id
+
+        WHERE main.PcCode=#{param.vendorId}
+        <if test="param.mailNoList !=null and param.mailNoList.size>0">
+            and main.Bin in
+            <foreach collection="param.mailNoList" item="mainlNo" index="index" separator="," open="(" close=")">
+                CAST(#{mainlNo} as int)
+            </foreach>
+        </if>
+        <if test="param.itemId !=null and param.itemId!=''">
+            and main.JAN=#{param.itemId}
+        </if>
+        <if test="param.linesList!=null and param.linesList.size>0">
+            and sp1.グループCD in
+            <foreach collection="param.linesList" item="lines" index="index" separator="," open="(" close=")">
+                CAST(#{lines} as int)
+            </foreach>
+        </if>
+        <if test="param.callCode !=null and param.callCode!=''">
+            and coalesce(sp.呼出品番, sp1.呼出品番)=CAST(#{param.callCode} as int)
+        </if>
+        <if test="param.itemName !=null and param.itemName!='' ">
+            and (sp1.商品名 like '%${param.itemName}%' or sp1.商品名カナ like '%${param.itemName}%')
+        </if>
+        and b.IsClosed=0
+        <choose>
+            <when test="param.pageSize != null and param.pageNum != null">
+                select count(1) as total, #{param.pageSize} as size, #{param.pageNum} as [current],
+                CEILING(1.0*count(1)/#{param.pageSize}) as pages from #record;
+                select
+                id,basics,cases,centerName,lineId,lineName,itemId,itemName,storeId,storeName,mailNo,callCode,mail
+                from
+                #record
+                where id > (#{param.pageNum} - 1)*#{param.pageSize} and id &lt;= #{param.pageNum}*#{param.pageSize}
+            </when>
+            <otherwise>
+                select count(1) as total, 0 as size, 1 as [current], 1 as pages from #record;
+                select
+                id,basics,cases,centerName,lineId,lineName,itemId,itemName,storeId,storeName,mailNo,callCode,mail
+                from
+                #record
+            </otherwise>
+        </choose>
+
+        drop table #record;
+        drop table #product;
+    </select>
+</mapper>

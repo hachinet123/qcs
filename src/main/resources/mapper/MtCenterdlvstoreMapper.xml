@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.MtCenterdlvstoreMapper">
+
+    <select id="search" resultType="com.tre.centralkitchen.domain.vo.system.MtCenterdlvstoreVo">
+
+        select mstore.center_id, b1.branchname as centerName,mstore.line_id, lines.linename as lineName ,
+        mstore.store_id,
+        b2.branchname as storeName, mstore.shortname as shortName, mstore.seq ,b2.openeddate as openedDate
+        from centralkitchen.mt_centerdlvstore mstore
+        inner join centralkitchen.branches b1 on mstore.center_id = b1.branchcd
+        inner join centralkitchen.lines lines on mstore.line_id = lines.linecd
+        inner join centralkitchen.branches b2 on mstore.store_id = b2.branchcd
+        <where>
+            <if test="param.centerId != null  ">
+                mstore.center_id = #{param.centerId}
+            </if>
+            <if test="param.lineIds != null and param.lineIds !='' ">
+                and mstore.line_id in
+                <foreach collection="param.lineIds" item="item" separator="," open="(" close=")">
+                    #{item}
+                </foreach>
+
+            </if>
+
+            and f_del = 0
+        </where>
+        order by mstore.seq asc
+
+    </select>
+    <select id="centerdlvstoreSelect" resultType="com.tre.centralkitchen.domain.vo.system.CenterdlvstoreVo">
+        select mstore.center_id, mstore.line_id, mstore.store_id, mstore.shortname as shortName, mstore.seq ,
+         concat(mstore.ins_date,' ',mstore.ins_time) as reqDate, concat(mstore.upd_date,' ',mstore.upd_time) as updDate,
+         concat(emp1.employeename,'  (',mstore.ins_user_id,')') as reqUserName, concat(emp2.employeename,'  (',mstore.upd_user_id,')') as updUserName
+        from centralkitchen.mt_centerdlvstore mstore
+        inner join centralkitchen.employees emp1 on  emp1.employeecode = mstore.ins_user_id
+        inner join centralkitchen.employees emp2 on  emp2.employeecode = mstore.upd_user_id
+        where mstore.center_id = #{centerId} and mstore.line_id = #{lineId} and mstore.store_id = #{storeId}
+        and f_del = 0
+    </select>
+
+</mapper>

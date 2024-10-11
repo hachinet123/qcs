@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.MtMailitemMapper">
+    <update id="insertFmt" parameterType="java.util.List">
+        <if test="list != null and !list.isEmpty()">
+            <foreach collection="list" index="index" item="param" separator=";">
+                insert into
+                centralkitchen.mt_mailitem(center_id,item_id,store_id,
+                mail_no,memo,f_del,ins_date,
+                ins_time,ins_user_id,ins_func_id,ins_ope_id,
+                upd_date,upd_time,upd_user_id,upd_func_id,upd_ope_id)values (
+                #{centerId}::integer,#{param.itemId},#{param.storeId}::int,#{param.mailNo}::smallint,#{param.memo},0,current_date,current_time
+                ,#{userId}::integer,#{insFuncId},#{insOpeId},current_date,current_time,#{userId}::integer,#{insFuncId},#{insOpeId}
+                )on conflict (center_id,store_id ,item_id)
+                do update
+                set mail_no=#{param.mailNo}::smallint,
+                memo=#{param.memo},
+                f_del=0,
+                upd_date=current_date,
+                upd_time=CURRENT_TIME,
+                upd_user_id=#{userId}::integer,
+                upd_func_id=#{insFuncId},
+                upd_ope_id=#{insOpeId}
+            </foreach>
+        </if>
+    </update>
+    <update id="recordImport" parameterType="java.util.List">
+        <if test="list != null and !list.isEmpty()">
+            <foreach collection="list" index="index" item="param" separator=";">
+                insert into
+                centralkitchen.mt_mailitem(center_id,item_id,store_id,
+                mail_no,memo,f_del,ins_date,
+                ins_time,ins_user_id,ins_func_id,ins_ope_id,
+                upd_date,upd_time,upd_user_id,upd_func_id,upd_ope_id)values (
+                #{param.centerId}::integer,#{param.itemId},#{param.storeId}::int,#{param.mailNo}::smallint,#{param.memo},0,current_date,current_time
+                ,#{userId}::integer,#{insFuncId},#{insOpeId},current_date,current_time,#{userId}::integer,#{insFuncId},#{insOpeId}
+                )on conflict (center_id,store_id ,item_id)
+                do update
+                set mail_no=#{param.mailNo}::smallint,
+                memo=#{param.memo},
+                f_del=0,
+                upd_date=current_date,
+                upd_time=CURRENT_TIME,
+                upd_user_id=#{userId}::integer,
+                upd_func_id=#{insFuncId},
+                upd_ope_id=#{insOpeId}
+            </foreach>
+        </if>
+    </update>
+    <select id="queryList" resultType="com.tre.centralkitchen.domain.vo.system.MtMailItemVo">
+        SELECT
+        mail.center_id AS centerId,
+        mail.item_id AS itemId,
+        mail.store_id AS storeId,
+        concat(mail.mail_no,'便') AS mail,
+        mail.mail_no AS mailNo,
+        mail.memo AS memo,
+        coalesce(ts.item_name,ts1.item_name) AS itemName,
+        coalesce(ts.call_code,ts1.call_code) AS callCode,
+        M.branchname AS storeName
+        FROM centralkitchen.mt_mailitem mail
+        INNER JOIN centralkitchen.mt_centerstatus mc
+        ON mail.center_id = mc.center_id
+        LEFT JOIN centralkitchen.purchasegroupbranches pg
+        ON mail.store_id = pg.branchcd
+        LEFT JOIN centralkitchen.tm_shohin ts
+        ON mc.vendor_id= ts.vendor_id
+        AND pg.purchasegroupcd = ts.area_id
+        AND mail.item_id=ts.item_id
+        AND ts.store_id=mail.store_id
+        AND ts.f_active!=9
+        LEFT JOIN centralkitchen.tm_shohin ts1
+        ON pg.purchasegroupcd = ts1.area_id
+        AND mc.vendor_id = ts1.vendor_id
+        AND mail.item_id=ts1.item_id
+        AND ts1.store_id=0
+        AND ts1.f_active!=9
+        LEFT JOIN centralkitchen.branches M
+        ON mail.store_id = M.branchcd
+        WHERE mail.center_id = #{param.centerId}
+        <if test="param.itemId !=null and param.itemId!='' ">
+            and mail.item_id=#{param.itemId}
+        </if>
+        and mail.f_del = 0 and mc.f_del=0 and M.isclosed=0
+        <if test="param.callCode !=null and param.callCode!=''">
+            and coalesce(ts.call_code,ts1.call_code)=#{param.callCode}::int
+        </if>
+        <if test="param.itemName !=null and param.itemName!='' ">
+            and (coalesce(ts.item_name,ts1.item_name) like CONCAT ('%',#{param.itemName},'%') or
+            coalesce(ts.item_name_k,ts1.item_name_k) like CONCAT ('%',#{param.itemName},'%'))
+        </if>
+        <if test="param.mailNoList !=null and param.mailNoList.size>0">
+            and mail_no in
+            <foreach collection="param.mailNoList" item="mainlNo" index="index" separator="," open="(" close=")">
+                #{mainlNo}::int
+            </foreach>
+        </if>
+        ORDER BY mail.mail_no,mail.item_id,mail.store_id
+    </select>
+    <select id="queryByList" resultType="com.tre.centralkitchen.domain.vo.system.MtMailItemVo">
+        SELECT distinct mail.center_id as centerId,
+                        mail.item_id   AS itemId,
+                        mail.store_id  AS storeId,
+                        mb.branchname  AS storeName,
+                        mail.mail_no   AS mailNo,
+                        mail.memo      AS memo,
+                        p.productname  AS itemName,
+                        mail.ins_date,
+                        mail.ins_time,
+                        mail.ins_user_id,
+                        mail.ins_func_id,
+                        mail.ins_ope_id,
+                        mail.upd_date,
+                        mail.upd_time,
+                        mail.upd_user_id,
+                        mail.upd_func_id,
+                        mail.upd_ope_id
+        FROM centralkitchen.mt_mailitem mail
+                 LEFT JOIN centralkitchen.branches mb
+                           ON mail.store_id = mb.branchcd
+                 left join centralkitchen.products p on mail.item_id = p.productcd
+        WHERE mail.center_id = #{param.centerId}
+          AND mail.item_id = #{param.itemId}
+          AND mail.store_id = #{param.storeId}
+          AND mail.f_del = 0
+    </select>
+    <select id="selectMailNoWithCenterId" resultType="java.util.Map">
+        select distinct mail_no as id, center_id as name
+        from centralkitchen.mt_mail
+        where center_id = #{centerId}
+          and f_del = 0
+        order by id
+    </select>
+    <select id="selectItemId" resultType="java.util.Map">
+        select distinct main.item_id as id, main.teikan_typeid as name
+        from centralkitchen.tm_shohin main
+        inner join centralkitchen.mt_centerstatus supc
+        on supc.center_id = #{centerId} and supc.vendor_id = main.vendor_id
+        left join centralkitchen.purchasegroupbranches pubr
+        on pubr.branchcd = main.store_id
+        and pubr.purchasegroupcd = main.area_id
+        <where>
+            <if test="itemIdList != null and !itemIdList.isEmpty()">
+                and main.item_id in
+                <foreach collection="itemIdList" index="index" item="item" open="(" close=")" separator=",">
+                    #{item}
+                </foreach>
+            </if>
+            and main.f_active != 9 and main.f_del=0 and supc.f_del=0
+        </where>
+        order by main.item_id
+    </select>
+    <select id="recordImportCheck" resultType="Integer">
+        SELECT count(1)
+        FROM centralkitchen.tm_shohin tm
+                 inner join centralkitchen.mt_centerstatus center
+                            on tm.vendor_id = center.vendor_id
+                 inner join (select purchasegroupcd, branchcd
+                             from centralkitchen.purchasegroupbranches
+                             where branchcd = #{storeId}) pur
+                            on tm.area_id = pur.purchasegroupcd
+        WHERE (tm.store_id = #{storeId} or tm.store_id = 0)
+          and tm.item_id = #{itemId}
+          and center.center_id = #{centerId}
+          and tm.f_active != 9
+    </select>
+    <select id="selectByIds" resultType="com.tre.centralkitchen.domain.vo.system.MtMailItemVo">
+        select concat_ws('-', main.center_id, main.item_id, main.store_id) as ids,
+               main.mail_no                                                as name
+        from centralkitchen.mt_mailitem main
+        where main.center_id = #{centerId}
+          and main.f_del = 0
+    </select>
+    <select id="selectBasicMailNo" resultType="com.tre.centralkitchen.domain.vo.system.MtMailItemVo">
+        SELECT mailstore.center_id as centerId
+             , attr.item_id        as itemId
+             , mailstore.store_id  as storeId
+             , mailstore.mail_no   as mailNo
+        FROM centralkitchen.mt_mailstore mailstore
+                 inner join centralkitchen.mt_mail mail
+                            on mailstore.center_id = mail.center_id and mailstore.mail_no = mail.mail_no
+                 inner join centralkitchen.mt_item_attr attr
+                            on mail.leadtime = attr.leadtime - 1 and mailstore.store_id = attr.store_id
+                 inner join centralkitchen.products p
+                            on attr.item_id = p.productcd
+                 inner join centralkitchen.v_finelinedept fl
+                            on p.departmentcd = fl.department_id and mail.line_id = fl.line_id
+                 left join centralkitchen.mt_mailitem mailitem
+                           on mailitem.item_id = attr.item_id and mailitem.store_id = attr.store_id and
+                              mailstore.center_id = mailitem.center_id
+        where mailstore.store_id = #{param.storeId}
+          and attr.item_id = #{param.itemId}
+          and mail.f_del = 0
+          and mailstore.f_del = 0;
+    </select>
+</mapper>

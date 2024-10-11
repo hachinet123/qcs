@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.WarehouseItemPredictionMapper">
+
+    <select id="search" resultType="com.tre.centralkitchen.domain.vo.system.WarehouseItemPredictionVo">
+        select  item.center_id centerId, branch.branchname as centerName, whouse.name as warehouseName,  item.warehouse_id as warehouseId, item.item_id, shohin.item_name, material.safetystock_qy as safetyStockQy,
+        shohin.exptime as expTime,tstork.qy tStorkQy, current_date as stockDate, shohin.vendor_id as vendorId, shohin.f_active as fActive,
+        replace(suppliername, '株式会社', '') as supplierName, suppliername as vendorName
+        from centralkitchen.mt_warehouseitem item
+        LEFT JOIN centralkitchen.mt_warehouse whouse ON whouse.center_id = item.center_id and whouse.id = item.warehouse_id
+        INNER JOIN centralkitchen.tr_stock tstork ON item.center_id = whouse.center_id and tstork.item_id = item.item_id  and tstork.stock_date =current_date
+        LEFT JOIN centralkitchen.purchasegroupbranches pubr ON item.center_id = pubr.branchcd
+        LEFT JOIN centralkitchen.tm_shohin shohin ON pubr.purchasegroupcd = shohin.area_id and item.item_id = shohin.item_id
+        LEFT JOIN centralkitchen.mt_itemcenter_material material ON material.center_id = item.center_id and material.item_id = item.item_id
+        LEFT JOIN centralkitchen.suppliers supply  on shohin.vendor_id::varchar = supply.suppliercd
+        LEFT JOIN centralkitchen.branches branch ON branch.branchcd = item.center_id
+        <where>
+            <if test="bo.wareHouseIds != '' and bo.wareHouseIds.size()>0">
+                item.warehouse_id in
+                <foreach collection="bo.wareHouseIds" item="id" index="index" open="(" close=")" separator=",">
+                    #{id}
+                </foreach>
+            </if>
+            <if test="bo.itemIds != '' and bo.itemIds.size()>0">
+                and
+                <foreach collection="bo.itemIds" item="id" separator="or">
+                    item.item_id = #{id}
+                </foreach>
+            </if>
+            <if test="bo.itemNames != '' and bo.itemNames.size()>0">
+                and
+                <foreach collection="bo.itemNames" item="name" separator="or">
+                    shohin.item_name like concat('%',#{name},'%')
+                </foreach>
+            </if>
+            <if test="bo.lineIds != '' and bo.lineIds.size()>0">
+                and shohin.line_id in
+                <foreach collection="bo.lineIds" item="id" index="index" open="(" close=")" separator=",">
+                    #{id}
+                </foreach>
+            </if>
+            <if test="bo.vendorId != null ">
+                and shohin.vendor_id = #{bo.vendorId}
+            </if>
+            <if test="bo.supplierName != null and bo.supplierName != ''">
+                and suppliername like concat ('%',#{bo.supplierName},'%')
+            </if>
+            and item.center_id=32 and shohin.store_id = 0 and shohin.f_active != 9 and item.f_del = 0
+        </where>
+    </select>
+    <select id="searchVo" resultType="com.tre.centralkitchen.domain.vo.system.WarehouseQyVo">
+    		select witem.item_id as itemId,witem.center_id as centerId , sum(plan.qy*mat_qy) as instQy, plan.dlvsched_date as dlvSCHedDate
+		from centralkitchen.mt_warehouseitem witem
+		left join centralkitchen.purchasegroupbranches pubr on witem.center_id = pubr.branchcd
+		inner join centralkitchen.mt_recipemat recipe on recipe.mat_id = witem.item_id and recipe.area_id = pubr.purchasegroupcd
+		left join centralkitchen.tr_produceplan plan  on plan.item_id = recipe.prod_id
+		where plan.dlvsched_date  between #{date} and #{endDate} and witem.center_id = #{centerId}
+		group by witem.center_id , plan.dlvsched_date, witem.item_id
+    </select>
+    <select id="searchHoliday" resultType="com.tre.centralkitchen.domain.vo.system.holidayVo">
+       select holiday, memo from centralkitchen.mt_holiday
+    </select>
+
+
+</mapper>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.UserMasterMapper">
+    <select id="getUserMasterList" resultType="com.tre.centralkitchen.domain.vo.system.UserMasterVo">
+        select u1.code as userId,
+        e.employeename as userName,
+        u2.center_id as centerId,
+        b.branchname as centerName,
+        u2.line_id as lineId,
+        l.linename as lineName,
+        u1.memo as memo
+        from centralkitchen.mt_userlogin u1
+        left join centralkitchen.mt_userattr u2
+        on u1.code = u2.code and u2.f_del=0
+        left join centralkitchen.lines l
+        on u2.line_id = l.linecd
+        left join centralkitchen.branches b
+        on u2.center_id = b.branchcd
+        left join centralkitchen.employees e
+        on u1.code::int = e.employeecode
+        <where>
+            <if test="param.userId != null and param.userId != ''">
+                and u1.code = #{param.userId}
+            </if>
+            and u1.f_del = 0
+            <if test="param.userName != null and param.userName != ''">
+                and e.employeename like CONCAT('%', #{param.userName}, '%')
+            </if>
+        </where>
+        order by u1.code::int
+    </select>
+
+    <select id="getUserMasterUpSearch" resultType="com.tre.centralkitchen.domain.vo.system.UserMasterUpSearchVo">
+        select u1.code                   as userId,
+               e.employeename            as userName,
+               u1.memo                   as memo,
+               u2.center_id              as centerId,
+               u2.line_id                as lineId,
+               u3.other_center_authority as otherCenterAuthority,
+               u3.other_line_authority   as otherLineAuthority,
+               u3.warehouse_authority    as warehouseAuthority,
+               u3.metamaterial_authority as metaMaterialAuthority,
+               u3.middle_authority       as middleAuthority,
+               u3.product_authority      as productAuthority,
+               u3.master_authority       as masterAuthority,
+               u3.user_authority         as userAuthority,
+               u3.except_authority       as exceptAuthority,
+               u3.system_authority       as systemAuthority,
+               u3.recipe_authority       as recipeAuthority,
+               u1.ins_user_id,
+               u1.ins_date,
+               u1.ins_time,
+               u1.upd_user_id,
+               u1.upd_date,
+               u1.upd_time
+        from centralkitchen.employees e
+                 left join centralkitchen.mt_userlogin u1
+                           on u1.code::int = e.employeecode and u1.f_del = 0
+                 left join centralkitchen.mt_userattr u2
+                           on u1.code = u2.code and u2.f_del = 0
+                 left join centralkitchen.mt_userrole u3
+                           on u1.code = u3.code and u3.f_del = 0
+        where e.employeecode = #{param.userId}::int
+    </select>
+</mapper>

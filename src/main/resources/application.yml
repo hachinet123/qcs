@@ -1,0 +1,141 @@
+ck-web-back:
+  name: ck-web-back
+  version: 1.0
+  copyrightYear: 2022
+  description: "セントラルキッチン　システム"
+
+server:
+  port: 8083
+  servlet:
+    context-path: /ck
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 400000
+        readTimeout: 400000
+      remote-server-name:
+        connectTimeout: 400000
+        readTimeout: 400000
+spring:
+  profiles:
+    active: ${active}
+  datasource:
+    hikari:
+      connection-timeout: 60000
+  servlet:
+    multipart:
+      enabled: true
+      location:
+      max-file-size: 5MB
+      max-request-size: 20MB
+      resolve-lazily: false
+  cron:
+    auto-clean-tmp-folder: 0 0 */3 * *
+com:
+  tre:
+    jdev:
+      add-path-patterns: /**
+      exclude-path-patterns: /jobApi/**,/print/**,/file/download/**,/oauth/**,/login/**,/upload/**,/static/**,/error/**,/swagger-resources/**,/webjars/**,/v3/**,/swagger-ui.html/**,/doc.html/**
+      token-category: JWT        # JWT default,REDIS
+      refresh-token: FALSE       # REDIS
+      pre-user-issuer: ck
+      pre-user-subject: ck
+      token-expire: 86400000     # Token
+      refresh-token-expire: 86400000
+      token-security-key: 46cc793c53dc451b8a4fe2cd0bb008471
+      header-device-key: deviceId
+      auth_header_key: "Authorization"
+      auth_type_prefix: "Bearer "
+    logger:
+      operator:
+        request: true
+        response: false
+
+jasypt:
+  encryptor:
+    password: true
+    algorithm: PBEWithMD5AndDES
+    key-obtention-iterations: 1000
+    pool-size: 1
+    string-output-type: base64
+
+# XSS
+xss:
+  enabled: false
+  excludes:
+  url-patterns: /*
+  white-list: none
+  filter-list: "'|and |exec |insert |select |delete |update |drop |count |chr |mid |master |truncate |char |declare |;|or |+"
+
+# mybatis-plus
+mybatis-plus:
+  configuration:
+    cache-enabled: true
+    lazy-loading-enabled: true
+    multiple-result-sets-enabled: true
+    use-column-label: true
+    map-underscore-to-camel-case: true
+    call-setters-on-nulls: true
+    jdbc-type-for-null: null
+  mapper-package: com.tre.**.mapper
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.tre.*.domain.po
+
+knife4j:
+  enable: true
+  production: false
+  basic:
+    enable: false
+    username: cksystem
+    password: 123456
+  setting:
+    language: zh-CN
+    enableFooter: false
+    enableDynamicParameter: true
+    enableReloadCacheParameter: true
+
+# Swagger
+swagger:
+  enabled: true
+  pathMapping: /
+  title: 'title：${ck-web-back.name}Background Management System_Interface Documentation'
+  description: '${ck-web-back.description}'
+  version: 'version: ${ck-web-back.version}'
+  contact:
+    name: tre
+    email:
+    url:
+  groups:
+    - name: 1.システムインタフェース
+      basePackage: com.tre.centralkitchen.controller.system
+    - name: 2.共通インタフェース
+      basePackage: com.tre.centralkitchen.controller.common
+
+# プロジェクト関連構成
+ck-web-backend:
+  # の名前をあげる
+  name: ck-web-backend
+  # バージョン
+  version: 1.0
+  # 著作権年
+  copyrightYear: 2023
+  # インスタンスデモスイッチ
+  demoEnabled: true
+  # ipアドレス取得スイッチ
+  addressEnabled: true
+  # キャッシュの怠惰ロード
+  cacheLazy: false
+
+# Business variable
+ck-system-business:
+  fmt-file-path:
+  tmp-file-path: "/tmp/ckTmpFile"
+  bkup-file-path: "/tmp/ckBackupFile"
+  send-file-path: "/tmp/ckSendFile"
+  recv-file-path: "/tmp/ckRecvFile"
+  production-instruction:
+    max-auto-print-number: 10
+
+authentication:
+  key: 178ff0015f8a6d31547776a04e0e238a

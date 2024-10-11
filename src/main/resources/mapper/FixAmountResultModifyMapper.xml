@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.FixAmountResultModifyMapper">
+    <select id="selectFixAmountResultModify"
+            resultType="com.tre.centralkitchen.domain.vo.system.FixAmountResultModifyPoVo">
+        with tmpMainTable as (
+        select main.center_id as centerId,
+        main.dlvsched_date as scheduleDate,
+        main.lot_no,
+        coalesce(item.call_code, item0.call_code) as callCode,
+        main.item_id as itemId,
+        coalesce(item.item_name, item0.item_name) as itemName,
+        coalesce(item.item_name_k, item0.item_name_k) as itemNameK,
+        main.mail_no as mailNo,
+        coalesce(item.line_id, item0.line_id) as lineId,
+        line.linename as lineName,
+        main.store_id as storeId,
+        dlvstore.shortname as storeNameAbbr,
+        concat('(', main.store_id, ')', dlvstore.shortname) as storeName,
+        coalesce(plac.id,0) as placeId,
+        coalesce(plac.name,'産地なし') as placeName,
+        logp.id as batchGroupNo,
+        main.inst_qy as qty,
+        main.weight as weight,
+        main.cost_rcp as pcPrice,
+        main.cost_item as itemPrice,
+        main.price as price,
+        coalesce(item.teikan_typeid, item0.teikan_typeid) as teikan_typeid,
+        main.ins_date,
+        main.upd_date,
+        main.ins_time,
+        main.upd_time
+        from centralkitchen.tr_produced main
+        left join centralkitchen.tr_produceplan plan
+        on main.dlvsched_date = plan.dlvsched_date
+        and main.center_id = plan.center_id
+        and main.mail_no = plan.mail_no
+        and main.item_id = plan.item_id
+        and main.store_id = plan.store_id
+        inner join centralkitchen.mt_mailcontrol mail
+        on main.mail_no = mail.mail_no
+        and main.center_id = mail.center_id
+        and main.dlvsched_date = mail.dlvsched_date
+        and mail.through_confirmed_date is null
+        left join centralkitchen.purchasegroupbranches pubr
+        on main.store_id = pubr.branchcd
+        left join centralkitchen.tm_shohin item
+        on main.item_id = item.item_id
+        and main.store_id = item.store_id
+        and pubr.purchasegroupcd = item.area_id
+        and item.pctgt_typeid = 2
+        left join centralkitchen.tm_shohin item0
+        on main.item_id = item0.item_id
+        and item0.store_id = 0
+        and pubr.purchasegroupcd = item0.area_id
+        and item0.pctgt_typeid = 2
+        left join centralkitchen.lines line
+        on item0.line_id = line.linecd
+        left join centralkitchen.mt_place plac
+        on main.place_id = plac.id
+        left join centralkitchen.mt_lotgroup logp
+        on item0.lotgrp_id = logp.id
+        LEFT JOIN  (select distinct store_id,shortname,line_id from centralkitchen.mt_centerdlvstore where center_id=#{param.centerId}) dlvstore
+        ON main.store_id = dlvstore.store_id
+        AND dlvstore.line_id = coalesce(item.line_id, item0.line_id)
+        where (item.pctgt_typeid = 2 or item0.pctgt_typeid = 2)
+
+        <if test="flag == 1">
+            AND (plan.center_id is not null AND main.ins_time = main.upd_time AND main.ins_date = main.upd_date)
+        </if>
+        <if test="flag == 2">
+            AND (plan.center_id is null AND main.ins_time = main.upd_time AND main.ins_date = main.upd_date)
+        </if>
+        <if test="flag == 3">
+            AND (plan.center_id is not null OR plan.center_id is null)
+        </if>
+        <if test="flag == 4">
+            AND (main.ins_time = main.upd_time AND main.ins_date = main.upd_date)
+        </if>
+        <if test="flag == 5">
+            AND (plan.center_id is not null)
+        </if>
+        <if test="flag == 6">
+            AND (plan.center_id is null)
+        </if>
+        )
+        select concat_ws('-',to_char(main.scheduleDate,'yyyymmdd'),
+        main.centerId,
+        main.mailNo,
+        main.itemId,
+        main.storeId) as id,
+        main.centerId as centerId,
+        main.lot_no,
+        to_char(main.scheduleDate, 'yyyy/MM/dd') as scheduleDate,
+        main.callCode as callCode,
+        main.itemId as itemId,
+        main.itemName as itemName,
+        concat(main.mailNo,'便') as mailNo,
+        main.mailNo as mailId,
+        main.lineId as lineId,
+        main.lineName as lineName,
+        main.storeId as storeId,
+        main.storeNameAbbr as storeNameAbbr,
+        main.storeName as storeName,
+        main.placeId as placeId,
+        main.placeName as placeName,
+        main.batchGroupNo as batchGroupNo,
+        main.qty as qty,
+        main.weight as weight,
+        main.pcPrice as pcPrice,
+        main.itemPrice as itemPrice,
+        main.price as price,
+        case
+        when main.teikan_typeid = 0 then round((main.pcPrice * main.weight / 100.00)::numeric, 0)
+        when main.teikan_typeid = 1 or main.teikan_typeid = 2 then round(main.pcPrice * main.qty, 0)
+        else 0 end as pcPriceAll,
+        case
+        when main.teikan_typeid = 0 then round((main.itemPrice * main.weight / 100.00)::numeric, 0)
+        when main.teikan_typeid = 1 or main.teikan_typeid = 2 then round(main.itemPrice * main.qty, 0)
+        else 0 end as itemPriceAll,
+        case
+        when main.teikan_typeid = 0 then round((main.price * main.weight / 100.00)::numeric, 0)
+        when main.teikan_typeid = 1 or main.teikan_typeid = 2 then round(main.price::int8 * main.qty, 0)
+        else 0 end as priceAll,
+        main.teikan_typeid as teikanTypeId,
+        case when main.ins_date = main.upd_date and main.ins_time = main.upd_time then 0
+        else 1 end as alreadyUpdate
+        from tmpMainTable main
+        INNER JOIN centralkitchen.mt_useline useLine
+        ON main.lineId = useLine.line_id
+        where main.centerId = #{param.centerId}
+        <if test="param.lineIdList != null and !param.lineIdList.isEmpty()">
+            and main.lineId in
+            <foreach collection="param.lineIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.mailIdList != null and !param.mailIdList.isEmpty()">
+            and main.mailNo in
+            <foreach collection="param.mailIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.type != null">
+            and main.callCode = #{param.type}
+        </if>
+        <if test="param.jan != null and !param.jan.isEmpty()">
+            and main.itemId = #{param.jan}
+        </if>
+        <if test="param.goodsName != null and !param.goodsName.isEmpty()">
+            and (main.itemName like concat('%', #{param.goodsName}, '%')
+            or main.itemNameK like concat('%', #{param.goodsName}, '%'))
+        </if>
+        order by main.scheduleDate,
+        main.callCode,
+        main.itemId,
+        main.mailNo,
+        useLine.seq,
+        main.lineId,
+        main.storeId
+    </select>
+    <select id="selectMailNoWithCenterId" resultType="com.tre.centralkitchen.domain.po.MtMailcontrol">
+        select distinct mail_no, center_id
+        from centralkitchen.mt_mailcontrol
+        where through_confirmed_date is null
+          and center_id = #{centerId}
+    </select>
+    <select id="selectFixAmountResultModifyBefore"
+            resultType="com.tre.centralkitchen.domain.vo.system.FixAmountResultModifyPoVo">
+        with tmpMainTable as (
+        select
+        plan.center_id as centerId,
+        plan.dlvsched_date as scheduleDate,
+        coalesce(item.call_code, item0.call_code) as callCode,
+        plan.item_id as itemId,
+        coalesce(item.item_name, item0.item_name) as itemName,
+        coalesce(item.item_name_k, item0.item_name_k) as itemNameK,
+        plan.mail_no as mailNo,
+        coalesce(item.line_id, item0.line_id) as lineId,
+        plan.store_id as storeId,
+        plan.qy as qty
+        from centralkitchen.tr_produceplan plan
+        inner join centralkitchen.tr_produced main
+        on main.dlvsched_date = plan.dlvsched_date
+        and main.center_id = plan.center_id
+        and main.mail_no = plan.mail_no
+        and main.item_id = plan.item_id
+        and main.store_id = plan.store_id
+        inner join centralkitchen.mt_mailcontrol mail
+        on plan.mail_no = mail.mail_no
+        and plan.center_id = mail.center_id
+        and plan.dlvsched_date = mail.dlvsched_date
+        and mail.through_confirmed_date is null
+        left join centralkitchen.purchasegroupbranches pubr
+        on plan.store_id = pubr.branchcd
+        left join centralkitchen.tm_shohin item
+        on plan.item_id = item.item_id
+        and plan.store_id = item.store_id
+        and pubr.purchasegroupcd = item.area_id
+        and item.pctgt_typeid = 2
+        left join centralkitchen.tm_shohin item0
+        on plan.item_id = item0.item_id
+        and item0.store_id = 0
+        and pubr.purchasegroupcd = item0.area_id
+        and item0.pctgt_typeid = 2
+        left join centralkitchen.lines line
+        on item0.line_id = line.linecd
+        where (item.pctgt_typeid = 2 or item0.pctgt_typeid = 2)
+        <if test="flag == 1">
+            AND (plan.center_id is not null AND main.ins_time = main.upd_time AND main.ins_date = main.upd_date)
+        </if>
+        <if test="flag == 4">
+            AND (main.ins_time = main.upd_time AND main.ins_date = main.upd_date)
+        </if>
+        <if test="flag == 2 or flag == 6">
+            AND plan.center_id is null
+        </if>
+        )
+        select
+        concat_ws('-',to_char(main.scheduleDate,'yyyymmdd'),
+        main.centerId,
+        main.mailNo,
+        main.itemId,
+        main.storeId) as id,
+        main.centerId as centerId,
+        to_char(main.scheduleDate, 'yyyy/MM/dd') as scheduleDate,
+        main.callCode as callCode,
+        main.itemId as itemId,
+        main.mailNo as mailId,
+        main.lineId as lineId,
+        main.storeId as storeId,
+        main.qty as qty
+        from tmpMainTable main
+        INNER JOIN centralkitchen.mt_useline useLine
+        ON main.lineId = useLine.line_id
+        where main.centerId = #{param.centerId}
+        <if test="param.lineIdList != null and !param.lineIdList.isEmpty()">
+            and main.lineId in
+            <foreach collection="param.lineIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.mailIdList != null and !param.mailIdList.isEmpty()">
+            and main.mailNo in
+            <foreach collection="param.mailIdList" open="(" close=")" index="index" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="param.type != null">
+            and main.callCode = #{param.type}
+        </if>
+        <if test="param.jan != null and !param.jan.isEmpty()">
+            and main.itemId = #{param.jan}
+        </if>
+        <if test="param.goodsName != null and !param.goodsName.isEmpty()">
+            and (main.itemName like concat('%', #{param.goodsName}, '%')
+            or main.itemNameK like concat('%', #{param.goodsName}, '%'))
+        </if>
+    </select>
+    <update id="updateFixAmountResultModifyPoBatch"
+            parameterType="java.util.List">
+        <if test="paramList != null and !paramList.isEmpty()">
+            <foreach collection="paramList" separator=";" open="" close="" item="param" index="index">
+                update centralkitchen.tr_produced
+                set place_id = #{param.placeId}::integer,
+                lot_no = #{param.lotNo},
+                inst_qy = #{param.qty}::integer,
+                weight = #{param.weight}::numeric,
+                cost_rcp = #{param.pcPrice}::numeric,
+                cost_item = #{param.itemPrice}::numeric,
+                price = #{param.price}::integer,
+                upd_date = CURRENT_DATE,
+                upd_time = CURRENT_TIME,
+                upd_user_id = #{userId}::integer,
+                upd_func_id = #{funcId},
+                upd_ope_id = #{opeId}
+                where dlvsched_date = (
+                select dlvsched_date from centralkitchen.mt_mailcontrol
+                where center_id = #{param.centerId}::integer and mail_no = #{param.mailId}::smallint
+                )
+                and center_id = #{param.centerId}::integer
+                and mail_no = #{param.mailId}::smallint
+                and store_id = #{param.storeId}::integer
+                and item_id = #{param.itemId}
+            </foreach>
+        </if>
+    </update>
+    <update id="updateOrInsertFixAmountResultModifyPoBatch"
+            parameterType="java.util.List">
+        <if test="paramList != null and !paramList.isEmpty()">
+            <foreach collection="paramList" index="index" item="param" separator=";">
+                insert into centralkitchen.tr_produced(
+                dlvsched_date, center_id, mail_no, item_id, store_id,
+                inst_qy, act_qy, cost_rcp, cost_item, price,
+                place_id, lot_no, weight, f_del,
+                ins_date, ins_time, ins_user_id, ins_func_id, ins_ope_id,
+                upd_date, upd_time, upd_user_id, upd_func_id, upd_ope_id
+                )
+                values (
+                (
+                select dlvsched_date from centralkitchen.mt_mailcontrol
+                where center_id = #{param.centerId}::integer and mail_no = #{param.mailNo}::smallint
+                ),
+                #{centerId}::integer,
+                #{param.mailNo}::smallint,
+                #{param.itemId},
+                #{param.storeId}::integer,
+                #{param.qty}::integer,
+                0,
+                #{param.pcPrice}::numeric,
+                #{param.itemPrice}::numeric,
+                #{param.price}::integer,
+                #{param.placeId}::integer,
+                #{param.lotNo},
+                #{param.weight}::numeric,
+                0,
+                current_date ,current_time ,#{userId}::integer ,#{funcId} ,#{opeId} ,
+                current_date ,current_time ,#{userId}::integer ,#{funcId} ,#{opeId}
+                )
+                on conflict (dlvsched_date ,center_id ,mail_no ,store_id ,item_id)
+                do update
+                set place_id = #{param.placeId}::integer,
+                lot_no = #{param.lotNo},
+                inst_qy = #{param.qty}::integer,
+                weight = #{param.weight}::numeric,
+                cost_rcp = #{param.pcPrice}::numeric,
+                cost_item = #{param.itemPrice}::numeric,
+                price = #{param.price}::integer,
+                upd_date = CURRENT_DATE,
+                upd_time = CURRENT_TIME,
+                upd_user_id = #{userId}::integer,
+                upd_func_id = #{funcId},
+                upd_ope_id = #{opeId}
+            </foreach>
+        </if>
+    </update>
+</mapper>

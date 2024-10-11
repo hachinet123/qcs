@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.OrderQtyMapper">
+
+    <select id="searchOrderQtyVo" resultType="com.tre.centralkitchen.service.impl.ShWOrderQtyVo">
+            select  ProdJAN as itemId,  DeliveryDate as deliveryDate, sum(OrderQty) as orderQty
+            from shW_OrderQty
+            where branchcd= #{centerId}
+             and DeliveryDate &gt;=  #{beginDate}
+             AND DeliveryDate &lt;=  #{endDate}
+            group by DeliveryDate,ProdJAN
+    </select>
+</mapper>

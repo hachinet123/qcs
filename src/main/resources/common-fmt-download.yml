@@ -1,0 +1,25 @@
+fmtMappings:
+  fixAmountResultModify:
+    fileType: xlsx
+    fileName: 生産指示_定額指示修正_一括登録フォーマット.xlsx
+    contentType: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+  mtMailItem:
+    fileType: xlsx
+    fileName: マスタ_便の個別設定.xlsx
+    contentType: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+  appended:
+    fileType: xlsx
+    fileName: 仕入出庫_出庫データ追加_一括登録フォーマット.xlsx
+    contentType: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+  appendedUpdate:
+    fileType: xlsx
+    fileName: 仕入出庫_出庫データ追加_既存修正.xlsx
+    contentType: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+  itemCenterMaterial:
+    fileType: xlsx
+    fileName: 在庫_原材料安全在庫管理_一括登録フォーマットファイル.xlsx
+    contentType: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+  dailyInventory:
+    fileType: xlsx
+    fileName: 在庫_日次棚卸_一括登録フォーマットファイル.xlsx
+    contentType: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
