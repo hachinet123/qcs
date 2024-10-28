@@ -15,6 +15,7 @@ import com.tre.centralkitchen.common.utils.SimpleCsvTableUtils;
 import com.tre.centralkitchen.domain.bo.system.CenterdlvstoreBo;
 import com.tre.centralkitchen.domain.bo.system.MtCenterdlvstoreBo;
 import com.tre.centralkitchen.domain.po.MtCenterdlvstore;
+import com.tre.centralkitchen.domain.vo.system.CenterdlvstoreMasterVo;
 import com.tre.centralkitchen.domain.vo.system.CenterdlvstoreVo;
 import com.tre.centralkitchen.domain.vo.system.MtCenterdlvstoreVo;
 import com.tre.centralkitchen.mapper.MtCenterdlvstoreMapper;
@@ -102,4 +103,11 @@ public class MtCenterdlvstoreServiceImpl implements MtCenterdlvstoreService {
                 .eq(MtCenterdlvstore::getSeq, mtCenterdlvstore.getSeq());
         mapper.update(mtCenterdlvstore, wrapper);
     }
+
+    @Override
+    public List<CenterdlvstoreMasterVo> centerSelect() {
+        List<CenterdlvstoreMasterVo> centerStore = mapper.centerSelect();
+        return centerStore;
+    }
+
 }

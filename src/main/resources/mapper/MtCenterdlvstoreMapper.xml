@@ -39,4 +39,13 @@
         and f_del = 0
     </select>
 
+    <select id="centerSelect" resultType="com.tre.centralkitchen.domain.vo.system.CenterdlvstoreMasterVo">
+        select distinct center_id, b.branchname center_name
+            from centralkitchen.mt_centerdlvstore c
+            inner join centralkitchen.branches b on c.center_id=b.branchcd
+        where line_id in (25,26) and center_id in
+            (SELECT center_id FROM centralkitchen.mt_centerstatus where f_del=0)
+        order by center_id;
+    </select>
+
 </mapper>

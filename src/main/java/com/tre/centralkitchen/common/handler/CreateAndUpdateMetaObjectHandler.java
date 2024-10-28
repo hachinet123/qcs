@@ -102,7 +102,8 @@ public class CreateAndUpdateMetaObjectHandler implements MetaObjectHandler {
 
     private Long getUserId() {
         try {
-            return Long.parseLong(tokenTakeApart.takeDecryptedUserId());
+//            return Long.parseLong(tokenTakeApart.takeDecryptedUserId());
+            return 0L;
         } catch (Exception e) {
             return 0L;
         }

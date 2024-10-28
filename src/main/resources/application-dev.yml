@@ -11,15 +11,15 @@ spring:
         postgres:
           type: com.zaxxer.hikari.HikariDataSource
           driverClassName: org.postgresql.Driver
-          url: jdbc:postgresql://172.21.17.170:25432/centralkitchen
-          username: manager
-          password: ENC(Asl17LQxIbWmJVUlC5fluA==)
-        sqlserver:
-          type: com.zaxxer.hikari.HikariDataSource
-          driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
-          url: jdbc:sqlserver://172.21.17.27:1433; DatabaseName=dbOrder;
-          username: systemuser
-          password: ENC(vzo2dgNsWHPpgXxfvqNhPEuGVED4cE+F)
+          url: jdbc:postgresql://localhost:15432/qcs_db
+          username: db_user
+          password: root
+#        sqlserver:
+#          type: com.zaxxer.hikari.HikariDataSource
+#          driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
+#          url: jdbc:sqlserver://172.21.17.27:1433; DatabaseName=dbOrder;
+#          username: systemuser
+#          password: ENC(vzo2dgNsWHPpgXxfvqNhPEuGVED4cE+F)
   mail:
     host: cn.tre-inc.com
     username: 10004406song_yingying@cn.tre-inc.com
@@ -28,7 +28,7 @@ spring:
     protocol: smtp
 
   redis:
-    host: xxx.xxx.xxx.xxx
+    host: localhost
     port: 6379
     database: 0
     password:

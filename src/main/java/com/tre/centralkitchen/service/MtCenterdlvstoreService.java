@@ -4,11 +4,13 @@ import com.tre.centralkitchen.common.domain.PageQuery;
 import com.tre.centralkitchen.common.domain.TableDataInfo;
 import com.tre.centralkitchen.domain.bo.system.CenterdlvstoreBo;
 import com.tre.centralkitchen.domain.bo.system.MtCenterdlvstoreBo;
+import com.tre.centralkitchen.domain.vo.system.CenterdlvstoreMasterVo;
 import com.tre.centralkitchen.domain.vo.system.CenterdlvstoreVo;
 import com.tre.centralkitchen.domain.vo.system.MtCenterdlvstoreVo;
 import org.springframework.stereotype.Service;
 
 import javax.servlet.http.HttpServletResponse;
+import java.util.List;
 
 
 public interface MtCenterdlvstoreService {
@@ -24,4 +26,6 @@ public interface MtCenterdlvstoreService {
     void update(CenterdlvstoreBo centerdlvstoreBo);
 
     void delete(CenterdlvstoreBo centerdlvstoreBo);
+
+    List<CenterdlvstoreMasterVo> centerSelect();
 }

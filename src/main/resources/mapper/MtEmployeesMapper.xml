@@ -16,6 +16,6 @@
                employeename,
                retirementdivision
         FROM centralkitchen.employees
-        WHERE (employeecode = #{userId}::int)
+        WHERE (employeecode = #{userId}::int) and retirementdivision=0
     </select>
 </mapper>

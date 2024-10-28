@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.MtSectionMapper">
+
+    <select id="managersSelect" resultType="com.tre.centralkitchen.domain.vo.system.MtSectionVo">
+        SELECT id, center_id, name FROM qcs.mt_section
+            where center_id=#{centerId}
+              and f_del=0
+            order by seq,id
+    </select>
+</mapper>
