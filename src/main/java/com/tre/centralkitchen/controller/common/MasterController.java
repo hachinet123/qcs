@@ -6,35 +6,49 @@ import com.tre.centralkitchen.common.enums.BusinessType;
 import com.tre.centralkitchen.domain.bo.common.CommonCenterLineBo;
 import com.tre.centralkitchen.domain.bo.common.CommonMailNoBo;
 import com.tre.centralkitchen.domain.po.MtHome;
+import com.tre.centralkitchen.domain.po.MtLanguage;
 import com.tre.centralkitchen.domain.po.Products;
 import com.tre.centralkitchen.domain.vo.common.*;
+import com.tre.centralkitchen.domain.vo.system.CenterdlvstoreMasterVo;
+import com.tre.centralkitchen.domain.vo.system.MtCenterdlvstoreVo;
+import com.tre.centralkitchen.domain.vo.system.MtSectionVo;
 import com.tre.centralkitchen.domain.vo.system.MtSysparamVo;
 import com.tre.centralkitchen.service.IMtSysparamService;
+import com.tre.centralkitchen.service.MtCenterdlvstoreService;
+import com.tre.centralkitchen.service.MtLanguageService;
+import com.tre.centralkitchen.service.MtSectionService;
 import com.tre.centralkitchen.service.commom.MasterService;
 import com.tre.jdevtemplateboot.common.dto.ResponseResult;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
+import java.io.IOException;
 import java.util.List;
 
 @RestController
 @Validated
-@RequestMapping("/common")
+@RequestMapping("/master")
 @RequiredArgsConstructor
 @Api(value = "共通ンコントローラ", tags = {"MST"})
+@Slf4j
 public class MasterController {
 
     private final MasterService masterService;
     private final IMtSysparamService iMtSysparamService;
+    private final MtCenterdlvstoreService mtCenterdlvstoreService;
+    private final MtSectionService mtSectionService;
+    private final MtLanguageService mtLanguageService;
 
     @ApiOperation("産地名称の取得")
     @GetMapping("/placeList")
@@ -157,6 +171,24 @@ public class MasterController {
     @GetMapping("/getSystemParam")
     public ResponseResult<MtSysparamVo> getSystemParam(Integer systemId, Integer paramId) {
         return ResponseResult.buildOK(iMtSysparamService.getParam(systemId, paramId));
+    }
+
+    @ApiOperation("マネージャーコントローラー")
+    @GetMapping(value = "/languages")
+    public ResponseResult<List<MtLanguage>> getLanguages() throws IOException {
+        return ResponseResult.buildOK(mtLanguageService.selectList());
+    }
+
+    @ApiOperation("中心リストを取得する")
+    @GetMapping(value = "/centralkitchenes")
+    public ResponseResult<List<CenterdlvstoreMasterVo>> getAllCenter() throws IOException {
+        return ResponseResult.buildOK(mtCenterdlvstoreService.centerSelect());
+    }
+
+    @ApiOperation("マネージャーコントローラー")
+    @GetMapping(value = "/managers")
+    public ResponseResult<List<MtSectionVo>> getManagers(@RequestParam("central_id") Integer centerId) throws IOException {
+        return ResponseResult.buildOK(mtSectionService.managersSelect(centerId));
     }
 
 }

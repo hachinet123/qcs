@@ -36,7 +36,7 @@ com:
   tre:
     jdev:
       add-path-patterns: /**
-      exclude-path-patterns: /jobApi/**,/print/**,/file/download/**,/oauth/**,/login/**,/upload/**,/static/**,/error/**,/swagger-resources/**,/webjars/**,/v3/**,/swagger-ui.html/**,/doc.html/**
+      exclude-path-patterns: /jobApi/**,/print/**,/file/download/**,/oauth/**,/login/**,/upload/**,/static/**,/error/**,/swagger-resources/**,/webjars/**,/v3/**,/swagger-ui.html/**,/doc.html/**,/v2/**,/userInfo,/master/**,/settings/**,/mtSettings/**,/subDepartments/**,/mtClient/**,/departments/**,/lines/**,
       token-category: JWT        # JWT default,REDIS
       refresh-token: FALSE       # REDIS
       pre-user-issuer: ck

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tre.centralkitchen.mapper.MtLanguagesMapper">
+
+    <select id="selectList" resultType="com.tre.centralkitchen.domain.vo.system.MtLanguageVo">
+        SELECT id, name, name_e FROM qcs.mt_language where f_del=0 order by seq,id;
+    </select>
+</mapper>

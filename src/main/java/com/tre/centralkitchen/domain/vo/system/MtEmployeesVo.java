@@ -19,6 +19,9 @@ public class MtEmployeesVo {
     /**
      * 退職区分
      */
-    @TableField("retirementdivision")
+    @ApiModelProperty("retirementdivision")
     private Integer retirementdivision;
+
+    @ApiModelProperty("retirementdivision")
+    private Integer isSetting;
 }
